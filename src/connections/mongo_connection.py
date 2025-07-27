@@ -45,7 +45,7 @@ class MongoConnection:
     
     def get_database(self) -> Database:
         """Retorna la instancia de la base de datos"""
-        if not self.database:
+        if self.database is None:
             self.connect()
         return self.database
     

@@ -4,11 +4,11 @@ import sys
 from datetime import datetime
 
 
-from extractors.roles_views_extractor import RolesViewsExtractor
-from transformers.roles_views_transformer import RolesViewsTransformer
-from loaders.mongo_loader import MongoLoader
-from validators.migration_validator import MigrationValidator
-from utils.logger import get_logger
+from ..extractors.roles_views_extractor import RolesViewsExtractor
+from ..transformers.roles_views_transformer import RolesViewsTransformer
+from ..loaders.mongo_loader import MongoLoader
+from ..validators.migration_validator import MigrationValidator
+from ..utils.logger import get_logger
 
 def main():
     """Función principal de migración"""
