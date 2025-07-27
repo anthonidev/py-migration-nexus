@@ -33,10 +33,14 @@ class MigrationApp:
             from src.core.roles_views_migration import main
             return main()
         
+        def migrate_users():
+            from src.core.users_migration import main
+            return main()
+        
         return {
             "ms-users": {
                 "roles-views": migrate_roles_views,
-                # "users": migrate_users,  # TODO: Implementar
+                "users": migrate_users,
             },
             # TODO: Agregar otros microservicios
             # "ms-payments": {
@@ -143,6 +147,13 @@ class MigrationApp:
         print("   • Migrará datos desde la base origen")
         print("   • Puede tomar varios minutos")
         
+        # Advertencias específicas por tipo de migración
+        if submodule_name == "users":
+            print("\n📋 REQUISITOS ESPECÍFICOS PARA USUARIOS:")
+            print("   • Los roles y vistas deben estar migrados previamente")
+            print("   • Se generarán documentos aleatorios para usuarios sin documentNumber")
+            print("   • Se establecerán relaciones jerárquicas padre-hijo")
+        
         while True:
             confirm = input("\n¿Estás seguro de continuar? (s/N): ").strip().lower()
             
@@ -166,9 +177,19 @@ class MigrationApp:
             if success:
                 print(f"\n🎉 ¡MIGRACIÓN COMPLETADA EXITOSAMENTE!")
                 print(f"✅ {module_name} -> {submodule_name} migrado correctamente")
+                
+                # Consejos post-migración
+                if submodule_name == "roles-views":
+                    print("\n💡 SIGUIENTE PASO RECOMENDADO:")
+                    print("   • Ahora puedes migrar los usuarios")
+                elif submodule_name == "users":
+                    print("\n💡 MIGRACIÓN COMPLETADA:")
+                    print("   • Usuarios migrados con sus relaciones jerárquicas")
+                    print("   • Revisa el reporte generado para estadísticas detalladas")
             else:
                 print(f"\n💥 MIGRACIÓN FALLÓ")
                 print(f"❌ Error en {module_name} -> {submodule_name}")
+                print("📄 Revisa los logs y el reporte de errores generado")
             
             return success
             
