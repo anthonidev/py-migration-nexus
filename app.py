@@ -10,7 +10,6 @@ from typing import Dict, List, Callable
 # Agregar el directorio raíz del proyecto al path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-
 # Cargar variables de entorno
 try:
     from dotenv import load_dotenv
@@ -42,6 +41,10 @@ class MigrationApp:
             from src.core.payment_configs_migration import main
             return main()
 
+        def migrate_payments():
+            from src.core.payments_migration import main
+            return main()
+
         return {
             "ms-users": {
                 "roles-views": migrate_roles_views,
@@ -49,7 +52,7 @@ class MigrationApp:
             },
             "ms-payments": {
                 "payment-configs": migrate_payment_configs,
-                # "payments": migrate_payments,  # TODO: Implementar después
+                "payments": migrate_payments,
             },
             # TODO: Agregar otros microservicios
             # "ms-membership": {
@@ -133,7 +136,8 @@ class MigrationApp:
                 "users": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_USER']
             },
             "ms-payments": {
-                "payment-configs": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_PAYMENTS']
+                "payment-configs": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_PAYMENTS'],
+                "payments": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_PAYMENTS', 'MS_NEXUS_USER']
             }
         }
 
@@ -198,6 +202,13 @@ class MigrationApp:
             print(
                 "   • Los códigos se transformarán a mayúsculas y se reemplazarán espacios")
             print("   • Se validarán longitudes de campos según la nueva entidad")
+        elif submodule_name == "payments":
+            print("\n📋 REQUISITOS ESPECÍFICOS PARA PAGOS:")
+            print("   • Las configuraciones de pago deben estar migradas previamente")
+            print("   • Los usuarios deben estar migrados en ms-users (MongoDB)")
+            print("   • Se conservarán los IDs originales de los pagos")
+            print("   • Se buscarán usuarios por email para obtener IDs y nombres")
+            print("   • Se transformarán métodos y estados de pago según nuevos enums")
 
         while True:
             confirm = input(
@@ -240,10 +251,15 @@ class MigrationApp:
                     print(
                         "   • Revisa el reporte generado para estadísticas detalladas")
                 elif submodule_name == "payment-configs":
-                    print("\n💡 MIGRACIÓN COMPLETADA:")
-                    print(
-                        "   • Configuraciones de pago migradas conservando IDs originales")
+                    print("\n💡 SIGUIENTE PASO RECOMENDADO:")
                     print("   • Ahora puedes migrar los pagos de usuarios")
+                elif submodule_name == "payments":
+                    print("\n💡 MIGRACIÓN COMPLETADA:")
+                    print("   • Pagos migrados conservando IDs originales")
+                    print("   • Items de pago migrados con referencias correctas")
+                    print("   • Usuarios vinculados mediante búsqueda por email")
+                    print(
+                        "   • Revisa el reporte generado para estadísticas detalladas")
             else:
                 print(f"\n💥 MIGRACIÓN FALLÓ")
                 print(f"❌ Error en {module_name} -> {submodule_name}")

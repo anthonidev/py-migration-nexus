@@ -169,7 +169,6 @@ def main():
 
 
 def save_migration_report(report_data, filename_prefix="payment_configs_migration_report"):
-    """Guarda el reporte de migración en un archivo"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     report_filename = f"{filename_prefix}_{timestamp}.json"
 
@@ -188,7 +187,6 @@ def save_migration_report(report_data, filename_prefix="payment_configs_migratio
 
 
 def validate_environment():
-    """Valida que las variables de entorno estén configuradas"""
     required_vars = ['NEXUS_POSTGRES_URL', 'MS_NEXUS_PAYMENTS']
     missing_vars = []
 
@@ -210,7 +208,6 @@ def validate_environment():
 
 
 def test_connections():
-    """Prueba las conexiones a las bases de datos"""
     logger.info("🔍 Probando conexiones a bases de datos...")
 
     try:
@@ -236,7 +233,6 @@ def test_connections():
 
 
 if __name__ == "__main__":
-    # Cargar variables de entorno desde .env si existe
     try:
         from dotenv import load_dotenv
         load_dotenv()
