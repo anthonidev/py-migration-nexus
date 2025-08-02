@@ -7,7 +7,9 @@ from .payment_configs_extractor import PaymentConfigsExtractor
 from .payments_extractor import PaymentsExtractor
 from .membership_plans_extractor import MembershipPlansExtractor
 from .memberships_extractor import MembershipsExtractor
+from .user_points_extractor import UserPointsExtractor
 
 __all__ = ['RolesViewsExtractor', 'UsersExtractor',
            'PaymentConfigsExtractor', 'PaymentsExtractor', 
-           'MembershipPlansExtractor', 'MembershipsExtractor']
+           'MembershipPlansExtractor', 'MembershipsExtractor',
+           'UserPointsExtractor']

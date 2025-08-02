@@ -40,3 +40,11 @@ class DatabaseConfig:
             raise ValueError(
                 "Variable de entorno MS_NEXUS_MEMBERSHIP no encontrada")
         return url
+
+    @staticmethod
+    def get_points_postgres_url() -> str:
+        url = os.getenv('MS_NEXUS_POINTS')
+        if not url:
+            raise ValueError(
+                "Variable de entorno MS_NEXUS_POINTS no encontrada")
+        return url

@@ -7,7 +7,9 @@ from .payment_configs_transformer import PaymentConfigsTransformer
 from .payments_transformer import PaymentsTransformer
 from .membership_plans_transformer import MembershipPlansTransformer
 from .memberships_transformer import MembershipsTransformer
+from .user_points_transformer import UserPointsTransformer
 
 __all__ = ['RolesViewsTransformer', 'UsersTransformer',
            'PaymentConfigsTransformer', 'PaymentsTransformer',
-           'MembershipPlansTransformer', 'MembershipsTransformer']
+           'MembershipPlansTransformer', 'MembershipsTransformer',
+           'UserPointsTransformer']

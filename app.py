@@ -52,6 +52,10 @@ class MigrationApp:
         def migrate_memberships():
             from src.core.memberships_migration import main
             return main()
+        
+        def migrate_user_points():
+            from src.core.user_points_migration import main
+            return main()
 
         return {
             "ms-users": {
@@ -66,10 +70,10 @@ class MigrationApp:
                 "membership-plans": migrate_membership_plans,
                 "memberships": migrate_memberships,
             },
+            "ms-points": {
+                "user-points": migrate_user_points,
+            },
             # TODO: Agregar otros microservicios
-            # "ms-points": {
-            #     "points": migrate_points,
-            # },
             # "ms-orders": {
             #     "orders": migrate_orders,
             # }
