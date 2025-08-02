@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from pymongo.errors import BulkWriteError, DuplicateKeyError
+from pymongo.errors import BulkWriteError
 from src.connections.mongo_connection import MongoConnection
 from src.utils.logger import get_logger
 
@@ -37,13 +37,10 @@ class UsersLoader:
             raise RuntimeError("La colección 'roles' está vacía. Ejecuta primero la migración de roles y vistas.")
     
     def load_users(self, users_data: List[Dict[str, Any]], clear_existing: bool = False) -> Dict[str, Any]:
-   
         logger.info(f"Iniciando carga de {len(users_data)} usuarios en MongoDB")
         
         try:
-            # Verificar que las colecciones existan
             self._check_collections_exist()
-            
             users_collection = self.database['users']
             
             if clear_existing:
@@ -59,16 +56,14 @@ class UsersLoader:
                 return {
                     'success': True,
                     'inserted_count': self.stats['users_inserted'],
-                    'deleted_count': self.stats['users_deleted'],
-                    'inserted_ids': [str(id) for id in insert_result.inserted_ids]
+                    'deleted_count': self.stats['users_deleted']
                 }
             else:
                 logger.warning("No hay usuarios para insertar")
                 return {
                     'success': True,
                     'inserted_count': 0,
-                    'deleted_count': self.stats['users_deleted'],
-                    'inserted_ids': []
+                    'deleted_count': self.stats['users_deleted']
                 }
         
         except BulkWriteError as e:
@@ -102,10 +97,6 @@ class UsersLoader:
                 'error': str(e)
             }
     
-    def create_indexes(self):
-     
-        logger.info("Los índices deben ser creados por las migraciones del microservicio ms-users")
-    
     def validate_data_integrity(self) -> Dict[str, Any]:
         logger.info("Validando integridad de datos de usuarios en MongoDB")
         
@@ -123,37 +114,24 @@ class UsersLoader:
             users_collection = self.database['users']
             
             total_users = users_collection.count_documents({})
-            active_users = users_collection.count_documents({'isActive': True})
-            users_with_parent = users_collection.count_documents({'parent': {'$ne': None}})
-            users_with_children = users_collection.count_documents({
-                '$or': [
-                    {'leftChild': {'$ne': None}},
-                    {'rightChild': {'$ne': None}}
-                ]
-            })
+            validation_results['stats'] = {'total_users': total_users}
             
-            validation_results['stats'] = {
-                'total_users': total_users,
-                'active_users': active_users,
-                'inactive_users': total_users - active_users,
-                'users_with_parent': users_with_parent,
-                'root_users': total_users - users_with_parent,
-                'users_with_children': users_with_children
-            }
-            
+            # Validar emails únicos
             email_count = len(list(users_collection.distinct('email')))
             if email_count != total_users:
                 validation_results['errors'].append("Emails duplicados encontrados")
                 validation_results['valid'] = False
             
+            # Validar códigos de referencia únicos
             referral_codes = list(users_collection.distinct('referralCode'))
-            referral_codes = [code for code in referral_codes if code]  # Filtrar None/vacíos
+            referral_codes = [code for code in referral_codes if code]
             users_with_referral = users_collection.count_documents({'referralCode': {'$ne': None, '$ne': ''}})
             
             if len(referral_codes) != users_with_referral:
                 validation_results['errors'].append("Códigos de referencia duplicados encontrados")
                 validation_results['valid'] = False
             
+            # Validar referencias de roles
             roles_collection = self.database['roles']
             all_role_ids = set(str(doc['_id']) for doc in roles_collection.find({}, {'_id': 1}))
             
@@ -174,39 +152,6 @@ class UsersLoader:
             validation_results['valid'] = False
         
         return validation_results
-    
-    def get_hierarchy_statistics(self) -> Dict[str, Any]:
-        if self.database is None:
-            self.connect()
-        
-        try:
-            users_collection = self.database['users']
-            
-            total_users = users_collection.count_documents({})
-            root_users = users_collection.count_documents({'parent': None})
-            users_with_left_child = users_collection.count_documents({'leftChild': {'$ne': None}})
-            users_with_right_child = users_collection.count_documents({'rightChild': {'$ne': None}})
-            users_with_both_children = users_collection.count_documents({
-                'leftChild': {'$ne': None},
-                'rightChild': {'$ne': None}
-            })
-            
-            left_position_users = users_collection.count_documents({'position': 'LEFT'})
-            right_position_users = users_collection.count_documents({'position': 'RIGHT'})
-            
-            return {
-                'total_users': total_users,
-                'root_users': root_users,
-                'users_with_left_child': users_with_left_child,
-                'users_with_right_child': users_with_right_child,
-                'users_with_both_children': users_with_both_children,
-                'left_position_users': left_position_users,
-                'right_position_users': right_position_users
-            }
-            
-        except Exception as e:
-            logger.error(f"Error obteniendo estadísticas de jerarquía: {str(e)}")
-            return {'error': str(e)}
     
     def get_load_stats(self) -> Dict[str, Any]:
         return {

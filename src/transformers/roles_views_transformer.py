@@ -6,7 +6,6 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-
 class RolesViewsTransformer:
 
     def __init__(self):
@@ -18,21 +17,21 @@ class RolesViewsTransformer:
         }
 
     def transform_views_data(self, views_data: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], Dict[int, str]]:
-     
         logger.info(f"Iniciando transformación de {len(views_data)} vistas")
 
         transformed_views = []
         view_id_mapping = {} 
 
+        # Generar mapping de IDs
         for view in views_data:
             old_id = view['id']
             new_id = str(ObjectId())
             view_id_mapping[old_id] = new_id
 
+        # Transformar vistas
         for view in views_data:
             try:
-                transformed_view = self._transform_single_view(
-                    view, view_id_mapping)
+                transformed_view = self._transform_single_view(view, view_id_mapping)
                 transformed_views.append(transformed_view)
                 self.stats['views_transformed'] += 1
 
@@ -41,12 +40,10 @@ class RolesViewsTransformer:
                 logger.error(error_msg)
                 self.stats['errors'].append(error_msg)
 
-        logger.info(
-            f"Transformación de vistas completada: {self.stats['views_transformed']} exitosas")
+        logger.info(f"Transformación de vistas completada: {self.stats['views_transformed']} exitosas")
         return transformed_views, view_id_mapping
 
     def _transform_single_view(self, view: Dict[str, Any], view_id_mapping: Dict[int, str]) -> Dict[str, Any]:
-       
         old_id = view['id']
         new_id = view_id_mapping[old_id]
 
@@ -79,21 +76,21 @@ class RolesViewsTransformer:
         return transformed_view
 
     def transform_roles_data(self, roles_data: List[Dict[str, Any]], view_id_mapping: Dict[int, str]) -> Tuple[List[Dict[str, Any]], Dict[int, str]]:
-       
         logger.info(f"Iniciando transformación de {len(roles_data)} roles")
 
         transformed_roles = []
         role_id_mapping = {}
 
+        # Generar mapping de IDs
         for role in roles_data:
             old_id = role['id']
             new_id = str(ObjectId())
             role_id_mapping[old_id] = new_id
 
+        # Transformar roles
         for role in roles_data:
             try:
-                transformed_role = self._transform_single_role(
-                    role, view_id_mapping, role_id_mapping)
+                transformed_role = self._transform_single_role(role, view_id_mapping, role_id_mapping)
                 transformed_roles.append(transformed_role)
                 self.stats['roles_transformed'] += 1
 
@@ -102,26 +99,22 @@ class RolesViewsTransformer:
                 logger.error(error_msg)
                 self.stats['errors'].append(error_msg)
 
-        logger.info(
-            f"Transformación de roles completada: {self.stats['roles_transformed']} exitosos")
+        logger.info(f"Transformación de roles completada: {self.stats['roles_transformed']} exitosos")
         return transformed_roles, role_id_mapping
 
     def _transform_single_role(self, role: Dict[str, Any], view_id_mapping: Dict[int, str], role_id_mapping: Dict[int, str]) -> Dict[str, Any]:
-
         old_id = role['id']
         new_id = role_id_mapping[old_id]
 
         view_object_ids = []
         if role.get('views'):
             try:
-                views_list = role['views'] if isinstance(
-                    role['views'], list) else json.loads(role['views'])
+                views_list = role['views'] if isinstance(role['views'], list) else json.loads(role['views'])
 
                 for view in views_list:
                     view_old_id = view.get('id')
                     if view_old_id and view_old_id in view_id_mapping:
-                        view_object_ids.append(
-                            ObjectId(view_id_mapping[view_old_id]))
+                        view_object_ids.append(ObjectId(view_id_mapping[view_old_id]))
                     else:
                         warning = f"Rol {old_id}: Vista {view_old_id} no encontrada en mapeo"
                         logger.warning(warning)
@@ -161,8 +154,7 @@ class RolesViewsTransformer:
         for role_data in roles_data:
             if role_data.get('views'):
                 try:
-                    views_list = role_data['views'] if isinstance(
-                        role_data['views'], list) else json.loads(role_data['views'])
+                    views_list = role_data['views'] if isinstance(role_data['views'], list) else json.loads(role_data['views'])
                     role_old_id = role_data['id']
                     role_new_id = role_id_mapping.get(role_old_id)
 
@@ -197,7 +189,6 @@ class RolesViewsTransformer:
             else:
                 return {}
         except (json.JSONDecodeError, TypeError):
-            logger.warning(f"Metadata inválido encontrado: {metadata}")
             return {}
 
     def _process_datetime(self, dt_value: Any) -> datetime:
@@ -214,15 +205,36 @@ class RolesViewsTransformer:
                         return datetime.strptime(dt_value, fmt)
                     except ValueError:
                         continue
-
-                logger.warning(
-                    f"No se pudo parsear fecha: {dt_value}, usando fecha actual")
                 return datetime.utcnow()
-
             except Exception:
                 return datetime.utcnow()
 
         return datetime.utcnow()
+
+    def validate_transformation(self, views: List[Dict[str, Any]], roles: List[Dict[str, Any]]) -> Dict[str, Any]:
+        validation_results = {
+            'valid': True,
+            'errors': [],
+            'warnings': []
+        }
+
+        view_codes = set()
+        for view in views:
+            if view['code'] in view_codes:
+                validation_results['errors'].append(f"Código de vista duplicado: {view['code']}")
+                validation_results['valid'] = False
+            view_codes.add(view['code'])
+
+        # Validar códigos únicos de roles
+        role_codes = set()
+        for role in roles:
+            if role['code'] in role_codes:
+                validation_results['errors'].append(f"Código de rol duplicado: {role['code']}")
+                validation_results['valid'] = False
+            role_codes.add(role['code'])
+
+        logger.info(f"Validación de transformación: {'EXITOSA' if validation_results['valid'] else 'FALLÓ'}")
+        return validation_results
 
     def get_transformation_summary(self) -> Dict[str, Any]:
         return {
@@ -233,47 +245,3 @@ class RolesViewsTransformer:
             'errors': self.stats['errors'],
             'warnings': self.stats['warnings']
         }
-
-    def validate_transformation(self, views: List[Dict[str, Any]], roles: List[Dict[str, Any]]) -> Dict[str, Any]:
-        validation_results = {
-            'valid': True,
-            'errors': [],
-            'warnings': [],
-            'stats': {
-                'views_count': len(views),
-                'roles_count': len(roles),
-                'views_with_roles': 0,
-                'roles_with_views': 0,
-                'parent_child_relationships': 0
-            }
-        }
-
-        view_codes = set()
-        for view in views:
-            if view['code'] in view_codes:
-                validation_results['errors'].append(
-                    f"Código de vista duplicado: {view['code']}")
-                validation_results['valid'] = False
-            view_codes.add(view['code'])
-
-            if view['roles']:
-                validation_results['stats']['views_with_roles'] += 1
-
-            if view['children']:
-                validation_results['stats']['parent_child_relationships'] += len(
-                    view['children'])
-
-        role_codes = set()
-        for role in roles:
-            if role['code'] in role_codes:
-                validation_results['errors'].append(
-                    f"Código de rol duplicado: {role['code']}")
-                validation_results['valid'] = False
-            role_codes.add(role['code'])
-
-            if role['views']:
-                validation_results['stats']['roles_with_views'] += 1
-
-        logger.info(
-            f"Validación de transformación: {'EXITOSA' if validation_results['valid'] else 'FALLÓ'}")
-        return validation_results

@@ -4,7 +4,6 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-
 class PaymentsLoader:
 
     def __init__(self):
@@ -106,7 +105,6 @@ class PaymentsLoader:
             return {'success': False, 'inserted_count': 0, 'error': str(e)}
 
     def _insert_payments_with_original_ids(self, payments_data: List[Dict[str, Any]]) -> int:
-
         insert_query = """
         INSERT INTO payments (
             id, user_id, user_email, user_name, payment_config_id, amount,
@@ -151,7 +149,6 @@ class PaymentsLoader:
             raise
 
     def _insert_payment_items(self, payment_items_data: List[Dict[str, Any]]) -> int:
-
         insert_query = """
         INSERT INTO payment_items (
             id, payment_id, item_type, url, url_key, points_transaction_id, 
@@ -198,19 +195,12 @@ class PaymentsLoader:
             total_payments = payments_count[0][0]
             total_items = items_count[0][0]
 
-            status_results, _ = self.postgres_conn.execute_query("SELECT status, COUNT(*) FROM payments GROUP BY status")
-            payments_by_status = {row[0]: row[1] for row in status_results}
-
-            method_results, _ = self.postgres_conn.execute_query("SELECT payment_method, COUNT(*) FROM payments GROUP BY payment_method")
-            payments_by_method = {row[0]: row[1] for row in method_results}
-
             validation_results['stats'] = {
                 'total_payments': total_payments,
-                'total_payment_items': total_items,
-                'payments_by_status': payments_by_status,
-                'payments_by_method': payments_by_method
+                'total_payment_items': total_items
             }
 
+            # Validar campos obligatorios
             missing_data, _ = self.postgres_conn.execute_query("""
                 SELECT COUNT(*) FROM payments 
                 WHERE user_email IS NULL OR user_email = '' 
@@ -222,6 +212,7 @@ class PaymentsLoader:
                 validation_results['errors'].append(f"{missing_data[0][0]} pagos con campos obligatorios inválidos")
                 validation_results['valid'] = False
 
+            # Validar items huérfanos
             orphan_items, _ = self.postgres_conn.execute_query("""
                 SELECT COUNT(*) FROM payment_items pi 
                 LEFT JOIN payments p ON pi.payment_id = p.id 

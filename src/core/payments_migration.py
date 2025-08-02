@@ -9,12 +9,9 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))
 
-
 logger = get_logger(__name__)
 
-
 def main():
-
     try:
         logger.info("🚀 === INICIANDO MIGRACIÓN DE PAGOS ===")
         start_time = datetime.now()
@@ -23,7 +20,6 @@ def main():
         logger.info("🔍 PASO 1: Validando datos de origen")
         extractor = PaymentsExtractor()
 
-        # Validar datos de origen
         validation_result = extractor.validate_source_data()
         if not validation_result['valid']:
             logger.error("❌ Validación de datos de origen fallida")
@@ -31,35 +27,16 @@ def main():
                 logger.error(f"   - {error}")
             return False
 
-        if validation_result['warnings']:
-            logger.warning("⚠️ Advertencias encontradas:")
-            for warning in validation_result['warnings']:
-                logger.warning(f"   - {warning}")
-
         # 2. EXTRACCIÓN
         logger.info("📤 PASO 2: Extrayendo pagos de PostgreSQL (monolito)")
         payments_data = extractor.extract_payments_data()
-        summary = extractor.get_extraction_summary()
-
         logger.info(f"✅ Extraídos {len(payments_data)} pagos")
-        logger.info(f"📊 Resumen: {summary['total_payments']} total")
-        logger.info(f"💳 Por método: {summary['payments_by_method']}")
-        logger.info(f"📈 Por estado: {summary['payments_by_status']}")
-        logger.info(f"🖼️ Con imágenes: {summary['payments_with_images']}")
-        logger.info(f"📋 Total imágenes: {summary['total_payment_images']}")
-
-        if summary['payments_without_config'] > 0:
-            logger.error(
-                f"❌ {summary['payments_without_config']} pagos sin configuración válida")
-            return False
 
         # 3. TRANSFORMACIÓN
         logger.info("🔄 PASO 3: Transformando datos para ms-payments PostgreSQL")
         transformer = PaymentsTransformer()
 
-        # Transformar pagos
-        transformed_payments, transformed_payment_items = transformer.transform_payments_data(
-            payments_data)
+        transformed_payments, transformed_payment_items = transformer.transform_payments_data(payments_data)
 
         # Validar transformación
         transformation_validation = transformer.validate_transformation(
@@ -71,20 +48,14 @@ def main():
             return False
 
         transform_summary = transformer.get_transformation_summary()
-        logger.info(f"✅ Transformación completada: {transform_summary}")
-
-        # Mostrar estadísticas de usuarios
-        if transform_summary['user_lookup_failures'] > 0:
-            logger.warning(
-                f"⚠️ {transform_summary['user_lookup_failures']} usuarios no encontrados de {transform_summary['user_lookups']} búsquedas")
+        logger.info(f"✅ Transformación completada: {transform_summary['payments_transformed']} pagos, {transform_summary['payment_items_transformed']} items")
 
         # 4. CARGA
         logger.info("📥 PASO 4: Cargando datos en PostgreSQL (ms-payments)")
         loader = PaymentsLoader()
 
         # Cargar pagos
-        payments_result = loader.load_payments(
-            transformed_payments, clear_existing=True)
+        payments_result = loader.load_payments(transformed_payments, clear_existing=True)
 
         if not payments_result['success']:
             logger.error("❌ Error en la carga de pagos")
@@ -92,11 +63,7 @@ def main():
                 logger.error(f"Error: {payments_result['error']}")
             return False
 
-        logger.info(
-            f"✅ Pagos cargados: {payments_result['inserted_count']} insertados")
-        if payments_result['deleted_count'] > 0:
-            logger.info(
-                f"🗑️ Pagos eliminados: {payments_result['deleted_count']}")
+        logger.info(f"✅ Pagos cargados: {payments_result['inserted_count']} insertados")
 
         # Cargar items de pago
         items_result = loader.load_payment_items(transformed_payment_items)
@@ -107,8 +74,7 @@ def main():
                 logger.error(f"Error: {items_result['error']}")
             return False
 
-        logger.info(
-            f"✅ Items de pago cargados: {items_result['inserted_count']} insertados")
+        logger.info(f"✅ Items de pago cargados: {items_result['inserted_count']} insertados")
 
         # 5. VALIDACIÓN POST-CARGA
         logger.info("✅ PASO 5: Validando integridad de datos")
@@ -118,20 +84,7 @@ def main():
             logger.error("❌ Validación de integridad fallida")
             for error in integrity_validation['errors']:
                 logger.error(f"   - {error}")
-
-            # Mostrar advertencias si las hay
-            if integrity_validation['warnings']:
-                logger.warning("⚠️ Advertencias:")
-                for warning in integrity_validation['warnings']:
-                    logger.warning(f"   - {warning}")
-
             return False
-
-        # Mostrar advertencias de integridad si las hay
-        if integrity_validation['warnings']:
-            logger.warning("⚠️ Advertencias de integridad:")
-            for warning in integrity_validation['warnings']:
-                logger.warning(f"   - {warning}")
 
         # 6. RESULTADOS
         end_time = datetime.now()
@@ -139,38 +92,39 @@ def main():
 
         logger.info("🎉 === MIGRACIÓN DE PAGOS COMPLETADA EXITOSAMENTE ===")
         logger.info(f"⏱️  Duración total: {duration}")
-        logger.info(
-            f"💳 Pagos migrados: {integrity_validation['stats']['total_payments']}")
-        logger.info(
-            f"📋 Items migrados: {integrity_validation['stats']['total_payment_items']}")
-        logger.info(
-            f"📊 Por estado: {integrity_validation['stats']['payments_by_status']}")
-        logger.info(
-            f"💰 Por método: {integrity_validation['stats']['payments_by_method']}")
-        logger.info(
-            f"👥 Búsquedas de usuarios: {transform_summary['user_lookups']}")
-        logger.info(
-            f"⚠️ Usuarios no encontrados: {transform_summary['user_lookup_failures']}")
+        logger.info(f"💳 Pagos migrados: {integrity_validation['stats']['total_payments']}")
+        logger.info(f"📋 Items migrados: {integrity_validation['stats']['total_payment_items']}")
 
-        # Guardar reporte detallado
+        # Guardar reporte simplificado
         save_migration_report({
             'summary': {
                 'success': True,
-                'duration': duration,
+                'duration': str(duration),
                 'payments_migrated': integrity_validation['stats']['total_payments'],
                 'payment_items_migrated': integrity_validation['stats']['total_payment_items']
             },
             'extraction': {
-                'total_extracted': len(payments_data),
-                'extraction_summary': summary
+                'total_extracted': len(payments_data)
             },
             'transformation': {
-                'transform_summary': transform_summary,
+                'payments_transformed': transform_summary['payments_transformed'],
+                'payment_items_transformed': transform_summary['payment_items_transformed'],
+                'total_errors': transform_summary['total_errors'],
+                'total_warnings': transform_summary['total_warnings'],
+                'errors': transform_summary['errors'],
+                'warnings': transform_summary['warnings'],
                 'validation': transformation_validation
             },
             'loading': {
-                'payments_result': payments_result,
-                'items_result': items_result,
+                'payments_result': {
+                    'success': payments_result['success'],
+                    'inserted_count': payments_result['inserted_count'],
+                    'deleted_count': payments_result['deleted_count']
+                },
+                'items_result': {
+                    'success': items_result['success'],
+                    'inserted_count': items_result['inserted_count']
+                },
                 'load_stats': loader.get_load_stats(),
                 'integrity_validation': integrity_validation
             }
@@ -179,8 +133,7 @@ def main():
         return True
 
     except Exception as e:
-        logger.error(
-            f"💥 Error crítico durante la migración de pagos: {str(e)}")
+        logger.error(f"💥 Error crítico durante la migración de pagos: {str(e)}")
         logger.exception("Detalles del error:")
         return False
 
@@ -196,18 +149,10 @@ def main():
         except Exception as e:
             logger.error(f"Error cerrando conexiones: {str(e)}")
 
-
 def save_migration_report(report_data, filename_prefix="payments_migration_report"):
-    """Guarda el reporte de migración en un archivo"""
+    """Guarda el reporte de migración simplificado en un archivo"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     report_filename = f"{filename_prefix}_{timestamp}.json"
-
-    # Añadir información adicional al reporte
-    report_data['execution_info'] = {
-        'timestamp': timestamp,
-        'platform': sys.platform,
-        'python_version': sys.version
-    }
 
     import json
     with open(report_filename, 'w', encoding='utf-8') as f:
@@ -215,11 +160,9 @@ def save_migration_report(report_data, filename_prefix="payments_migration_repor
 
     logger.info(f"📄 Reporte de migración guardado en: {report_filename}")
 
-
 def validate_environment():
     """Valida que las variables de entorno estén configuradas"""
-    required_vars = ['NEXUS_POSTGRES_URL',
-                     'MS_NEXUS_PAYMENTS', 'MS_NEXUS_USER']
+    required_vars = ['NEXUS_POSTGRES_URL', 'MS_NEXUS_PAYMENTS', 'MS_NEXUS_USER']
     missing_vars = []
 
     for var in required_vars:
@@ -230,16 +173,9 @@ def validate_environment():
         logger.error("❌ Variables de entorno faltantes:")
         for var in missing_vars:
             logger.error(f"   - {var}")
-        logger.info("\n💡 Configura las variables en tu .env o sistema:")
-        logger.info("   NEXUS_POSTGRES_URL=postgresql://user:pass@host:port/db")
-        logger.info(
-            "   MS_NEXUS_PAYMENTS=postgresql://user:pass@host:port/ms_payments_db")
-        logger.info(
-            "   MS_NEXUS_USER=mongodb://user:pass@host:port/ms_nexus_user")
         return False
 
     return True
-
 
 def check_dependencies():
     """Verifica que las dependencias estén disponibles"""
@@ -252,18 +188,15 @@ def check_dependencies():
         payments_conn = PaymentsPostgresConnection()
         payments_conn.connect()
 
-        # Verificar tabla payment_configs
         check_configs_query = "SELECT COUNT(*) FROM payment_configs"
         configs_count, _ = payments_conn.execute_query(check_configs_query)
 
         if configs_count[0][0] == 0:
             logger.error("❌ No hay configuraciones de pago en ms-payments")
-            logger.error(
-                "💡 Ejecuta primero la migración de configuraciones de pago")
+            logger.error("💡 Ejecuta primero la migración de configuraciones de pago")
             return False
 
-        logger.info(
-            f"✅ Encontradas {configs_count[0][0]} configuraciones de pago en ms-payments")
+        logger.info(f"✅ Encontradas {configs_count[0][0]} configuraciones de pago en ms-payments")
         payments_conn.disconnect()
 
         # Verificar que existan usuarios en MongoDB
@@ -271,8 +204,7 @@ def check_dependencies():
 
         user_service = UserService()
         # Hacer una búsqueda de prueba
-        test_result = user_service.get_user_by_email(
-            "test@test.com")  # No importa si no existe
+        test_result = user_service.get_user_by_email("test@test.com")
         user_service.close_connection()
 
         logger.info("✅ Servicio de usuarios disponible")
@@ -281,7 +213,6 @@ def check_dependencies():
     except Exception as e:
         logger.error(f"❌ Error verificando dependencias: {str(e)}")
         return False
-
 
 def test_connections():
     """Prueba las conexiones a las bases de datos"""
@@ -315,28 +246,22 @@ def test_connections():
         logger.error(f"❌ Error en conexiones: {str(e)}")
         return False
 
-
 if __name__ == "__main__":
-    # Cargar variables de entorno desde .env si existe
     try:
         from dotenv import load_dotenv
         load_dotenv()
     except ImportError:
         pass
 
-    # Validar entorno
     if not validate_environment():
         sys.exit(1)
 
-    # Probar conexiones
     if not test_connections():
         sys.exit(1)
 
-    # Verificar dependencias
     if not check_dependencies():
         sys.exit(1)
 
-    # Ejecutar migración
     success = main()
 
     if success:

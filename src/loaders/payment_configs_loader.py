@@ -4,7 +4,6 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-
 class PaymentConfigsLoader:
 
     def __init__(self):
@@ -51,7 +50,6 @@ class PaymentConfigsLoader:
             raise
 
     def load_payment_configs(self, configs_data: List[Dict[str, Any]], clear_existing: bool = False) -> Dict[str, Any]:
-      
         logger.info(f"Iniciando carga de {len(configs_data)} configuraciones de pago en PostgreSQL")
 
         try:
@@ -92,7 +90,6 @@ class PaymentConfigsLoader:
             }
 
     def _insert_configs_with_original_ids(self, configs_data: List[Dict[str, Any]]) -> int:
-
         insert_query = """
         INSERT INTO payment_configs (id, code, name, description, is_active, created_at, updated_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -123,45 +120,7 @@ class PaymentConfigsLoader:
 
         except Exception as e:
             logger.error(f"Error en inserción masiva: {str(e)}")
-            return self._insert_configs_one_by_one(configs_data)
-
-    def _insert_configs_one_by_one(self, configs_data: List[Dict[str, Any]]) -> int:
-        logger.warning("Intentando inserción una por una debido a errores en inserción masiva")
-
-        insert_query = """
-        INSERT INTO payment_configs (id, code, name, description, is_active, created_at, updated_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """
-
-        successful_inserts = 0
-
-        for config in configs_data:
-            try:
-                params = (
-                    config['id'],
-                    config['code'],
-                    config['name'],
-                    config['description'],
-                    config['is_active'],
-                    config['created_at'],
-                    config['updated_at']
-                )
-
-                self.postgres_conn.execute_query(insert_query, params)
-                successful_inserts += 1
-
-            except Exception as e:
-                error_msg = f"Error insertando configuración ID {config['id']}: {str(e)}"
-                logger.error(error_msg)
-                self.stats['errors'].append(error_msg)
-
-        # Actualizar secuencia
-        if successful_inserts > 0:
-            max_id = max(config['id'] for config in configs_data)
-            update_sequence_query = f"SELECT setval('payment_configs_id_seq', {max_id}, true);"
-            self.postgres_conn.execute_query(update_sequence_query)
-
-        return successful_inserts
+            raise
 
     def validate_data_integrity(self) -> Dict[str, Any]:
         logger.info("Validando integridad de datos de configuraciones en PostgreSQL")
@@ -178,25 +137,18 @@ class PaymentConfigsLoader:
             total_count, _ = self.postgres_conn.execute_query(count_query)
             total_configs = total_count[0][0]
 
-            active_query = "SELECT COUNT(*) FROM payment_configs WHERE is_active = true"
-            active_count, _ = self.postgres_conn.execute_query(active_query)
-            active_configs = active_count[0][0]
+            validation_results['stats'] = {'total_configs': total_configs}
 
+            # Validar códigos únicos
             unique_codes_query = "SELECT COUNT(DISTINCT code) FROM payment_configs"
             unique_count, _ = self.postgres_conn.execute_query(unique_codes_query)
             unique_codes = unique_count[0][0]
-
-            validation_results['stats'] = {
-                'total_configs': total_configs,
-                'active_configs': active_configs,
-                'inactive_configs': total_configs - active_configs,
-                'unique_codes': unique_codes
-            }
 
             if unique_codes != total_configs:
                 validation_results['errors'].append("Códigos duplicados encontrados")
                 validation_results['valid'] = False
 
+            # Validar campos obligatorios
             missing_data_query = """
             SELECT COUNT(*) FROM payment_configs 
             WHERE code IS NULL OR code = '' OR name IS NULL OR name = ''

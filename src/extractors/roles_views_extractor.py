@@ -112,83 +112,87 @@ class RolesViewsExtractor:
             logger.error(f"Error extrayendo vistas: {str(e)}")
             raise
     
-    def extract_role_view_relationships(self) -> List[Dict[str, Any]]:
-        logger.info("Extrayendo relaciones role-view desde PostgreSQL")
+    def validate_source_data(self) -> Dict[str, Any]:
+        """Valida datos básicos de origen"""
+        logger.info("Validando datos de origen")
         
-        query = """
-        SELECT 
-            rv.role_id,
-            rv.view_id,
-            r.code as role_code,
-            v.code as view_code
-        FROM 
-            public.role_views rv
-            INNER JOIN public.roles r ON rv.role_id = r.id
-            INNER JOIN public.views v ON rv.view_id = v.id
-        ORDER BY 
-            rv.role_id, rv.view_id;
-        """
+        validation_results = {
+            'valid': True,
+            'errors': [],
+            'warnings': []
+        }
         
         try:
-            results, columns = self.postgres_conn.execute_query(query)
+            # Validar códigos únicos de roles
+            duplicate_roles_query = """
+            SELECT code, COUNT(*) as count 
+            FROM public.roles 
+            GROUP BY code 
+            HAVING COUNT(*) > 1
+            """
+            duplicate_roles_results, _ = self.postgres_conn.execute_query(duplicate_roles_query)
             
-            relationships = []
-            for row in results:
-                rel_dict = dict(zip(columns, row))
-                relationships.append(rel_dict)
+            if duplicate_roles_results:
+                for row in duplicate_roles_results:
+                    code, count = row
+                    validation_results['errors'].append(f"Código de rol duplicado: '{code}' ({count} veces)")
+                validation_results['valid'] = False
             
-            logger.info(f"Extraídas {len(relationships)} relaciones role-view")
-            return relationships
+            # Validar códigos únicos de vistas
+            duplicate_views_query = """
+            SELECT code, COUNT(*) as count 
+            FROM public.views 
+            GROUP BY code 
+            HAVING COUNT(*) > 1
+            """
+            duplicate_views_results, _ = self.postgres_conn.execute_query(duplicate_views_query)
+            
+            if duplicate_views_results:
+                for row in duplicate_views_results:
+                    code, count = row
+                    validation_results['errors'].append(f"Código de vista duplicado: '{code}' ({count} veces)")
+                validation_results['valid'] = False
+            
+            # Validar campos obligatorios en roles
+            missing_role_data_query = """
+            SELECT id, code, name
+            FROM public.roles 
+            WHERE code IS NULL OR code = '' OR name IS NULL OR name = ''
+            """
+            missing_role_results, _ = self.postgres_conn.execute_query(missing_role_data_query)
+            
+            if missing_role_results:
+                for row in missing_role_results:
+                    role_id, code, name = row
+                    validation_results['errors'].append(
+                        f"Rol ID {role_id}: código='{code}', nombre='{name}' - campos obligatorios vacíos"
+                    )
+                validation_results['valid'] = False
+            
+            # Validar campos obligatorios en vistas
+            missing_view_data_query = """
+            SELECT id, code, name
+            FROM public.views 
+            WHERE code IS NULL OR code = '' OR name IS NULL OR name = ''
+            """
+            missing_view_results, _ = self.postgres_conn.execute_query(missing_view_data_query)
+            
+            if missing_view_results:
+                for row in missing_view_results:
+                    view_id, code, name = row
+                    validation_results['errors'].append(
+                        f"Vista ID {view_id}: código='{code}', nombre='{name}' - campos obligatorios vacíos"
+                    )
+                validation_results['valid'] = False
+            
+            logger.info(f"Validación de datos: {'EXITOSA' if validation_results['valid'] else 'CON ERRORES'}")
+            return validation_results
             
         except Exception as e:
-            logger.error(f"Error extrayendo relaciones role-view: {str(e)}")
-            raise
-    
-    def get_extraction_summary(self) -> Dict[str, Any]:
-        try:
-            # Contar roles
-            roles_count_query = "SELECT COUNT(*) FROM public.roles WHERE \"isActive\" = true"
-            roles_results, _ = self.postgres_conn.execute_query(roles_count_query)
-            active_roles_count = roles_results[0][0]
-            
-            total_roles_query = "SELECT COUNT(*) FROM public.roles"
-            total_roles_results, _ = self.postgres_conn.execute_query(total_roles_query)
-            total_roles_count = total_roles_results[0][0]
-            
-            # Contar vistas
-            views_count_query = "SELECT COUNT(*) FROM public.views WHERE \"isActive\" = true"
-            views_results, _ = self.postgres_conn.execute_query(views_count_query)
-            active_views_count = views_results[0][0]
-            
-            total_views_query = "SELECT COUNT(*) FROM public.views"
-            total_views_results, _ = self.postgres_conn.execute_query(total_views_query)
-            total_views_count = total_views_results[0][0]
-            
-            # Contar relaciones
-            relationships_query = "SELECT COUNT(*) FROM public.role_views"
-            rel_results, _ = self.postgres_conn.execute_query(relationships_query)
-            relationships_count = rel_results[0][0]
-            
-            summary = {
-                'roles': {
-                    'total': total_roles_count,
-                    'active': active_roles_count,
-                    'inactive': total_roles_count - active_roles_count
-                },
-                'views': {
-                    'total': total_views_count,
-                    'active': active_views_count,
-                    'inactive': total_views_count - active_views_count
-                },
-                'relationships': relationships_count
-            }
-            
-            logger.info(f"Resumen de extracción: {summary}")
-            return summary
-            
-        except Exception as e:
-            logger.error(f"Error obteniendo resumen de extracción: {str(e)}")
-            raise
+            logger.error(f"Error en validación de datos: {str(e)}")
+            validation_results['valid'] = False
+            validation_results['errors'].append(f"Error en validación: {str(e)}")
+            return validation_results
     
     def close_connection(self):
         self.postgres_conn.disconnect()

@@ -9,20 +9,17 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))
 
-
 logger = get_logger(__name__)
 
-
 def main():
-
     try:
         logger.info("🚀 === INICIANDO MIGRACIÓN DE PLANES DE MEMBRESÍA ===")
         start_time = datetime.now()
 
+        # 1. VALIDACIÓN PREVIA
         logger.info("🔍 PASO 1: Validando datos de origen")
         extractor = MembershipPlansExtractor()
 
-        # Validar datos de origen
         validation_result = extractor.validate_source_data()
         if not validation_result['valid']:
             logger.error("❌ Validación de datos de origen fallida")
@@ -30,41 +27,19 @@ def main():
                 logger.error(f"   - {error}")
             return False
 
-        if validation_result['warnings']:
-            logger.warning("⚠️ Advertencias encontradas:")
-            for warning in validation_result['warnings']:
-                logger.warning(f"   - {warning}")
-
         # 2. EXTRACCIÓN
-        logger.info(
-            "📤 PASO 2: Extrayendo planes de membresía de PostgreSQL (monolito)")
+        logger.info("📤 PASO 2: Extrayendo planes de membresía de PostgreSQL (monolito)")
         plans_data = extractor.extract_membership_plans()
-        summary = extractor.get_extraction_summary()
-
         logger.info(f"✅ Extraídos {len(plans_data)} planes de membresía")
-        logger.info(
-            f"📊 Resumen: {summary['total_plans']} total, {summary['active_plans']} activos")
-        logger.info(
-            f"💰 Rango de precios: ${summary['price_range']['min_price']:.2f} - ${summary['price_range']['max_price']:.2f}")
-        logger.info(f"📦 Con productos: {summary['plans_with_products']}")
-        logger.info(f"🎁 Con beneficios: {summary['plans_with_benefits']}")
-
-        if summary['plans_missing_names'] > 0:
-            logger.error(
-                f"❌ {summary['plans_missing_names']} planes sin nombre")
-            return False
 
         # 3. TRANSFORMACIÓN
-        logger.info(
-            "🔄 PASO 3: Transformando datos para ms-membership PostgreSQL")
+        logger.info("🔄 PASO 3: Transformando datos para ms-membership PostgreSQL")
         transformer = MembershipPlansTransformer()
 
-        # Transformar planes
         transformed_plans = transformer.transform_membership_plans(plans_data)
 
         # Validar transformación
-        transformation_validation = transformer.validate_transformation(
-            transformed_plans)
+        transformation_validation = transformer.validate_transformation(transformed_plans)
         if not transformation_validation['valid']:
             logger.error("❌ Validación de transformación fallida")
             for error in transformation_validation['errors']:
@@ -72,23 +47,13 @@ def main():
             return False
 
         transform_summary = transformer.get_transformation_summary()
-        logger.info(f"✅ Transformación completada: {transform_summary}")
-
-        # Mostrar estadísticas de limpieza
-        if transform_summary['array_cleanups'] > 0:
-            logger.info(
-                f"🧹 {transform_summary['array_cleanups']} arrays limpiados")
-        if transform_summary['name_cleanups'] > 0:
-            logger.info(
-                f"✂️ {transform_summary['name_cleanups']} nombres truncados")
+        logger.info(f"✅ Transformación completada: {transform_summary['plans_transformed']} planes")
 
         # 4. CARGA
         logger.info("📥 PASO 4: Cargando datos en PostgreSQL (ms-membership)")
         loader = MembershipPlansLoader()
 
-        # Cargar planes
-        load_result = loader.load_membership_plans(
-            transformed_plans, clear_existing=True)
+        load_result = loader.load_membership_plans(transformed_plans, clear_existing=True)
 
         if not load_result['success']:
             logger.error("❌ Error en la carga de planes")
@@ -96,11 +61,7 @@ def main():
                 logger.error(f"Error: {load_result['error']}")
             return False
 
-        logger.info(
-            f"✅ Planes cargados: {load_result['inserted_count']} insertados")
-        if load_result['deleted_count'] > 0:
-            logger.info(
-                f"🗑️ Planes eliminados: {load_result['deleted_count']}")
+        logger.info(f"✅ Planes cargados: {load_result['inserted_count']} insertados")
 
         # 5. VALIDACIÓN POST-CARGA
         logger.info("✅ PASO 5: Validando integridad de datos")
@@ -110,63 +71,40 @@ def main():
             logger.error("❌ Validación de integridad fallida")
             for error in integrity_validation['errors']:
                 logger.error(f"   - {error}")
-
-            # Mostrar advertencias si las hay
-            if integrity_validation['warnings']:
-                logger.warning("⚠️ Advertencias:")
-                for warning in integrity_validation['warnings']:
-                    logger.warning(f"   - {warning}")
-
             return False
-
-        # Mostrar advertencias de integridad si las hay
-        if integrity_validation['warnings']:
-            logger.warning("⚠️ Advertencias de integridad:")
-            for warning in integrity_validation['warnings']:
-                logger.warning(f"   - {warning}")
 
         # 6. RESULTADOS
         end_time = datetime.now()
         duration = end_time - start_time
 
-        logger.info(
-            "🎉 === MIGRACIÓN DE PLANES DE MEMBRESÍA COMPLETADA EXITOSAMENTE ===")
+        logger.info("🎉 === MIGRACIÓN DE PLANES DE MEMBRESÍA COMPLETADA EXITOSAMENTE ===")
         logger.info(f"⏱️  Duración total: {duration}")
-        logger.info(
-            f"📋 Planes migrados: {integrity_validation['stats']['total_plans']}")
-        logger.info(
-            f"✅ Planes activos: {integrity_validation['stats']['active_plans']}")
-        logger.info(
-            f"❌ Planes inactivos: {integrity_validation['stats']['inactive_plans']}")
-        logger.info(
-            f"📦 Con productos: {integrity_validation['stats']['plans_with_products']}")
-        logger.info(
-            f"🎁 Con beneficios: {integrity_validation['stats']['plans_with_benefits']}")
+        logger.info(f"📋 Planes migrados: {integrity_validation['stats']['total_plans']}")
 
-        # Mostrar estadísticas de precios si están disponibles
-        if integrity_validation['stats'].get('price_stats'):
-            price_stats = integrity_validation['stats']['price_stats']
-            logger.info(f"💰 Precios - Min: ${price_stats.get('min_price', 0):.2f}, "
-                        f"Max: ${price_stats.get('max_price', 0):.2f}, "
-                        f"Promedio: ${price_stats.get('avg_price', 0):.2f}")
-
-        # Guardar reporte detallado
+        # Guardar reporte simplificado
         save_migration_report({
             'summary': {
                 'success': True,
-                'duration': duration,
+                'duration': str(duration),
                 'plans_migrated': integrity_validation['stats']['total_plans']
             },
             'extraction': {
-                'total_extracted': len(plans_data),
-                'extraction_summary': summary
+                'total_extracted': len(plans_data)
             },
             'transformation': {
-                'transform_summary': transform_summary,
+                'plans_transformed': transform_summary['plans_transformed'],
+                'total_errors': transform_summary['total_errors'],
+                'total_warnings': transform_summary['total_warnings'],
+                'errors': transform_summary['errors'],
+                'warnings': transform_summary['warnings'],
                 'validation': transformation_validation
             },
             'loading': {
-                'load_result': load_result,
+                'load_result': {
+                    'success': load_result['success'],
+                    'inserted_count': load_result['inserted_count'],
+                    'deleted_count': load_result['deleted_count']
+                },
                 'load_stats': loader.get_load_stats(),
                 'integrity_validation': integrity_validation
             }
@@ -175,8 +113,7 @@ def main():
         return True
 
     except Exception as e:
-        logger.error(
-            f"💥 Error crítico durante la migración de planes de membresía: {str(e)}")
+        logger.error(f"💥 Error crítico durante la migración de planes de membresía: {str(e)}")
         logger.exception("Detalles del error:")
         return False
 
@@ -190,25 +127,16 @@ def main():
         except Exception as e:
             logger.error(f"Error cerrando conexiones: {str(e)}")
 
-
 def save_migration_report(report_data, filename_prefix="membership_plans_migration_report"):
-    """Guarda el reporte de migración en un archivo"""
+    """Guarda el reporte de migración simplificado en un archivo"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     report_filename = f"{filename_prefix}_{timestamp}.json"
-
-    # Añadir información adicional al reporte
-    report_data['execution_info'] = {
-        'timestamp': timestamp,
-        'platform': sys.platform,
-        'python_version': sys.version
-    }
 
     import json
     with open(report_filename, 'w', encoding='utf-8') as f:
         json.dump(report_data, f, indent=2, default=str)
 
     logger.info(f"📄 Reporte de migración guardado en: {report_filename}")
-
 
 def validate_environment():
     """Valida que las variables de entorno estén configuradas"""
@@ -223,14 +151,9 @@ def validate_environment():
         logger.error("❌ Variables de entorno faltantes:")
         for var in missing_vars:
             logger.error(f"   - {var}")
-        logger.info("\n💡 Configura las variables en tu .env o sistema:")
-        logger.info("   NEXUS_POSTGRES_URL=postgresql://user:pass@host:port/db")
-        logger.info(
-            "   MS_NEXUS_MEMBERSHIP=postgresql://user:pass@host:port/ms_membership_db")
         return False
 
     return True
-
 
 def test_connections():
     """Prueba las conexiones a las bases de datos"""
@@ -256,7 +179,6 @@ def test_connections():
     except Exception as e:
         logger.error(f"❌ Error en conexiones: {str(e)}")
         return False
-
 
 if __name__ == "__main__":
     try:

@@ -4,7 +4,6 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-
 class MembershipPlansLoader:
 
     def __init__(self):
@@ -51,7 +50,6 @@ class MembershipPlansLoader:
             raise
 
     def load_membership_plans(self, plans_data: List[Dict[str, Any]], clear_existing: bool = False) -> Dict[str, Any]:
-      
         logger.info(f"Iniciando carga de {len(plans_data)} planes de membresía en PostgreSQL")
 
         try:
@@ -92,7 +90,6 @@ class MembershipPlansLoader:
             }
 
     def _insert_plans_with_original_ids(self, plans_data: List[Dict[str, Any]]) -> int:
-
         insert_query = """
         INSERT INTO membership_plans (
             id, name, price, check_amount, binary_points, commission_percentage,
@@ -151,40 +148,9 @@ class MembershipPlansLoader:
             total_count, _ = self.postgres_conn.execute_query(count_query)
             total_plans = total_count[0][0]
 
-            active_query = "SELECT COUNT(*) FROM membership_plans WHERE is_active = true"
-            active_count, _ = self.postgres_conn.execute_query(active_query)
-            active_plans = active_count[0][0]
+            validation_results['stats'] = {'total_plans': total_plans}
 
-            price_stats_query = """
-            SELECT MIN(price) as min_price, MAX(price) as max_price, AVG(price) as avg_price
-            FROM membership_plans WHERE is_active = true
-            """
-            price_stats, price_columns = self.postgres_conn.execute_query(price_stats_query)
-            price_data = dict(zip(price_columns, price_stats[0])) if price_stats else {}
-
-            with_products_query = """
-            SELECT COUNT(*) FROM membership_plans 
-            WHERE products IS NOT NULL AND array_length(products, 1) > 0
-            """
-            products_count, _ = self.postgres_conn.execute_query(with_products_query)
-            plans_with_products = products_count[0][0]
-
-            with_benefits_query = """
-            SELECT COUNT(*) FROM membership_plans 
-            WHERE benefits IS NOT NULL AND array_length(benefits, 1) > 0
-            """
-            benefits_count, _ = self.postgres_conn.execute_query(with_benefits_query)
-            plans_with_benefits = benefits_count[0][0]
-
-            validation_results['stats'] = {
-                'total_plans': total_plans,
-                'active_plans': active_plans,
-                'inactive_plans': total_plans - active_plans,
-                'plans_with_products': plans_with_products,
-                'plans_with_benefits': plans_with_benefits,
-                'price_stats': price_data
-            }
-
+            # Validar campos obligatorios
             missing_data_query = """
             SELECT COUNT(*) FROM membership_plans 
             WHERE name IS NULL OR name = ''

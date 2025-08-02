@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from pymongo.errors import BulkWriteError, DuplicateKeyError
+from pymongo.errors import BulkWriteError
 from src.connections.mongo_connection import MongoConnection
 from src.utils.logger import get_logger
 
@@ -34,12 +34,10 @@ class MongoLoader:
             raise RuntimeError("Colección 'roles' no existe. Debe ser creada por las migraciones del microservicio.")
     
     def load_views(self, views_data: List[Dict[str, Any]], clear_existing: bool = False) -> Dict[str, Any]:
-     
         logger.info(f"Iniciando carga de {len(views_data)} vistas en MongoDB")
         
         try:
             self._check_collections_exist()
-            
             views_collection = self.database['views']
             
             if clear_existing:
@@ -55,16 +53,14 @@ class MongoLoader:
                 return {
                     'success': True,
                     'inserted_count': self.stats['views_inserted'],
-                    'deleted_count': self.stats['views_deleted'],
-                    'inserted_ids': [str(id) for id in insert_result.inserted_ids]
+                    'deleted_count': self.stats['views_deleted']
                 }
             else:
                 logger.warning("No hay vistas para insertar")
                 return {
                     'success': True,
                     'inserted_count': 0,
-                    'deleted_count': self.stats['views_deleted'],
-                    'inserted_ids': []
+                    'deleted_count': self.stats['views_deleted']
                 }
         
         except BulkWriteError as e:
@@ -98,7 +94,6 @@ class MongoLoader:
             }
     
     def load_roles(self, roles_data: List[Dict[str, Any]], clear_existing: bool = False) -> Dict[str, Any]:
-        
         logger.info(f"Iniciando carga de {len(roles_data)} roles en MongoDB")
         
         if self.database is None:
@@ -120,16 +115,14 @@ class MongoLoader:
                 return {
                     'success': True,
                     'inserted_count': self.stats['roles_inserted'],
-                    'deleted_count': self.stats['roles_deleted'],
-                    'inserted_ids': [str(id) for id in insert_result.inserted_ids]
+                    'deleted_count': self.stats['roles_deleted']
                 }
             else:
                 logger.warning("No hay roles para insertar")
                 return {
                     'success': True,
                     'inserted_count': 0,
-                    'deleted_count': self.stats['roles_deleted'],
-                    'inserted_ids': []
+                    'deleted_count': self.stats['roles_deleted']
                 }
         
         except BulkWriteError as e:
@@ -162,10 +155,6 @@ class MongoLoader:
                 'error': str(e)
             }
     
-    def create_indexes(self):
-       
-        logger.info("Los índices deben ser creados por las migraciones del microservicio ms-users")
-    
     def validate_data_integrity(self) -> Dict[str, Any]:
         logger.info("Validando integridad de datos en MongoDB")
         
@@ -187,22 +176,23 @@ class MongoLoader:
             roles_count = roles_collection.count_documents({})
             
             validation_results['stats'] = {
-                'views_count': views_count,
-                'roles_count': roles_count,
-                'active_views': views_collection.count_documents({'isActive': True}),
-                'active_roles': roles_collection.count_documents({'isActive': True})
+                'total_views': views_count,
+                'total_roles': roles_count
             }
             
+            # Validar códigos únicos de vistas
             view_codes = list(views_collection.distinct('code'))
             if len(view_codes) != views_count:
                 validation_results['errors'].append("Códigos de vista duplicados encontrados")
                 validation_results['valid'] = False
             
+            # Validar códigos únicos de roles
             role_codes = list(roles_collection.distinct('code'))
             if len(role_codes) != roles_count:
                 validation_results['errors'].append("Códigos de rol duplicados encontrados")
                 validation_results['valid'] = False
             
+            # Validar referencias entre roles y vistas
             all_view_ids = set(str(doc['_id']) for doc in views_collection.find({}, {'_id': 1}))
             
             for role in roles_collection.find({'views': {'$ne': []}}):
@@ -213,6 +203,7 @@ class MongoLoader:
                         )
                         validation_results['valid'] = False
             
+            # Validar referencias entre vistas y roles
             all_role_ids = set(str(doc['_id']) for doc in roles_collection.find({}, {'_id': 1}))
             
             for view in views_collection.find({'roles': {'$ne': []}}):
