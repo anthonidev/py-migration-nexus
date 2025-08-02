@@ -45,6 +45,10 @@ class MigrationApp:
             from src.core.payments_migration import main
             return main()
 
+        def migrate_membership_plans():
+            from src.core.membership_plans_migration import main
+            return main()
+
         return {
             "ms-users": {
                 "roles-views": migrate_roles_views,
@@ -54,10 +58,10 @@ class MigrationApp:
                 "payment-configs": migrate_payment_configs,
                 "payments": migrate_payments,
             },
+            "ms-membership": {
+                "membership-plans": migrate_membership_plans,
+            },
             # TODO: Agregar otros microservicios
-            # "ms-membership": {
-            #     "memberships": migrate_memberships,
-            # },
             # "ms-points": {
             #     "points": migrate_points,
             # },
@@ -123,6 +127,7 @@ class MigrationApp:
             print("   NEXUS_POSTGRES_URL=postgresql://user:pass@host:port/db")
             print("   MS_NEXUS_USER=mongodb://user:pass@host:port/db")
             print("   MS_NEXUS_PAYMENTS=postgresql://user:pass@host:port/db")
+            print("   MS_NEXUS_MEMBERSHIP=postgresql://user:pass@host:port/db")
             return False
 
         print("✅ Variables de entorno básicas configuradas correctamente")
@@ -138,6 +143,9 @@ class MigrationApp:
             "ms-payments": {
                 "payment-configs": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_PAYMENTS'],
                 "payments": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_PAYMENTS', 'MS_NEXUS_USER']
+            },
+            "ms-membership": {
+                "membership-plans": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_MEMBERSHIP']
             }
         }
 
@@ -209,6 +217,14 @@ class MigrationApp:
             print("   • Se conservarán los IDs originales de los pagos")
             print("   • Se buscarán usuarios por email para obtener IDs y nombres")
             print("   • Se transformarán métodos y estados de pago según nuevos enums")
+        elif submodule_name == "membership-plans":
+            print("\n📋 REQUISITOS ESPECÍFICOS PARA PLANES DE MEMBRESÍA:")
+            print("   • Se conservarán los IDs originales de los planes")
+            print(
+                "   • Se limpiarán arrays de productos y beneficios eliminando elementos vacíos")
+            print("   • Se validarán rangos numéricos según las reglas de la entidad")
+            print("   • Los nombres se truncarán a 100 caracteres si es necesario")
+            print("   • Se aplicarán todas las validaciones @BeforeInsert/@BeforeUpdate")
 
         while True:
             confirm = input(
@@ -258,6 +274,15 @@ class MigrationApp:
                     print("   • Pagos migrados conservando IDs originales")
                     print("   • Items de pago migrados con referencias correctas")
                     print("   • Usuarios vinculados mediante búsqueda por email")
+                    print(
+                        "   • Revisa el reporte generado para estadísticas detalladas")
+                elif submodule_name == "membership-plans":
+                    print("\n💡 MIGRACIÓN COMPLETADA:")
+                    print(
+                        "   • Planes de membresía migrados conservando IDs originales")
+                    print("   • Arrays de productos y beneficios limpiados")
+                    print("   • Validaciones de entidad aplicadas correctamente")
+                    print("   • Ahora puedes migrar las membresías de usuarios")
                     print(
                         "   • Revisa el reporte generado para estadísticas detalladas")
             else:

@@ -1,0 +1,360 @@
+"""
+Transformador de datos de planes de membresía para PostgreSQL ms-membership
+"""
+from typing import List, Dict, Any
+from datetime import datetime
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+class MembershipPlansTransformer:
+    """Transformador de datos de planes de membresía para PostgreSQL ms-membership"""
+
+    def __init__(self):
+        self.stats = {
+            'plans_transformed': 0,
+            'errors': [],
+            'warnings': [],
+            'array_cleanups': 0,
+            'name_cleanups': 0
+        }
+
+    def transform_membership_plans(self, plans_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Transforma los datos de planes de membresía para ms-membership
+
+        Args:
+            plans_data: Lista de planes desde PostgreSQL origen
+
+        Returns:
+            Lista de planes transformados
+        """
+        logger.info(
+            f"Iniciando transformación de {len(plans_data)} planes de membresía")
+
+        transformed_plans = []
+
+        for plan in plans_data:
+            try:
+                transformed_plan = self._transform_single_plan(plan)
+                transformed_plans.append(transformed_plan)
+                self.stats['plans_transformed'] += 1
+
+            except Exception as e:
+                error_msg = f"Error transformando plan {plan.get('id', 'unknown')}: {str(e)}"
+                logger.error(error_msg)
+                self.stats['errors'].append(error_msg)
+
+        logger.info(
+            f"Transformación completada: {self.stats['plans_transformed']} planes exitosos")
+        return transformed_plans
+
+    def _transform_single_plan(self, plan: Dict[str, Any]) -> Dict[str, Any]:
+        """Transforma un plan individual según las reglas de la entidad"""
+
+        # Conservar el ID original (muy importante)
+        original_id = plan['id']
+
+        # Transformar y limpiar nombre
+        name = self._clean_name(plan.get('name', ''))
+
+        # Validar y transformar campos numéricos
+        price = self._validate_decimal_field(
+            plan.get('price'), 'price', min_value=0.0)
+        check_amount = self._validate_decimal_field(
+            plan.get('checkAmount'), 'checkAmount', min_value=0.0)
+        binary_points = self._validate_integer_field(
+            plan.get('binaryPoints'), 'binaryPoints', min_value=0)
+        commission_percentage = self._validate_decimal_field(
+            plan.get('commissionPercentage'), 'commissionPercentage',
+            min_value=0.0, max_value=100.0)
+
+        # directCommissionAmount puede ser None
+        direct_commission_amount = None
+        if plan.get('directCommissionAmount') is not None:
+            direct_commission_amount = self._validate_decimal_field(
+                plan.get('directCommissionAmount'), 'directCommissionAmount',
+                allow_none=True)
+
+        # Limpiar y validar arrays
+        products = self._clean_array_field(plan.get('products', []))
+        benefits = self._clean_array_field(plan.get('benefits', []))
+
+        # Campos booleanos y de orden
+        is_active = bool(plan.get('isActive', True))
+        display_order = int(plan.get('displayOrder', 0))
+
+        # Procesar fechas
+        created_at = self._process_datetime(plan.get('createdAt'))
+        updated_at = self._process_datetime(plan.get('updatedAt'))
+
+        transformed_plan = {
+            'id': original_id,  # Conservar ID original
+            'name': name,
+            'price': price,
+            'check_amount': check_amount,
+            'binary_points': binary_points,
+            'commission_percentage': commission_percentage,
+            'direct_commission_amount': direct_commission_amount,
+            'products': products,
+            'benefits': benefits,
+            'is_active': is_active,
+            'display_order': display_order,
+            'created_at': created_at,
+            'updated_at': updated_at
+        }
+
+        return transformed_plan
+
+    def _clean_name(self, name: str) -> str:
+        """Limpia el nombre del plan según @BeforeInsert/@BeforeUpdate"""
+        if not name:
+            raise ValueError("El nombre es requerido y no puede estar vacío")
+
+        # Aplicar trim como indica la entidad
+        cleaned_name = name.strip()
+
+        if not cleaned_name:
+            raise ValueError("El nombre no puede estar vacío después del trim")
+
+        # Validar longitud máxima (100 caracteres)
+        if len(cleaned_name) > 100:
+            warning = f"Nombre '{cleaned_name}' excede 100 caracteres, será truncado"
+            logger.warning(warning)
+            self.stats['warnings'].append(warning)
+            self.stats['name_cleanups'] += 1
+            cleaned_name = cleaned_name[:100]
+
+        return cleaned_name
+
+    def _clean_array_field(self, array_field: List[str]) -> List[str]:
+        """Limpia arrays eliminando elementos vacíos según @BeforeInsert/@BeforeUpdate"""
+        if not array_field:
+            return []
+
+        if not isinstance(array_field, list):
+            # Si viene como string (formato PostgreSQL de array), convertir
+            if isinstance(array_field, str):
+                # Procesar formato PostgreSQL array: {item1,item2,item3}
+                if array_field.startswith('{') and array_field.endswith('}'):
+                    # Remover llaves y dividir por comas
+                    items = array_field[1:-1].split(',')
+                    array_field = [item.strip()
+                                   for item in items if item.strip()]
+                else:
+                    array_field = [array_field]
+            else:
+                return []
+
+        # Limpiar elementos según las reglas de la entidad
+        cleaned_array = []
+        for item in array_field:
+            if item and str(item).strip():
+                cleaned_item = str(item).strip()
+                if cleaned_item:  # Doble verificación
+                    cleaned_array.append(cleaned_item)
+
+        if len(cleaned_array) != len(array_field):
+            self.stats['array_cleanups'] += 1
+
+        return cleaned_array
+
+    def _validate_decimal_field(self, value: Any, field_name: str,
+                                min_value: float = None, max_value: float = None,
+                                allow_none: bool = False) -> float:
+        """Valida campos decimales según las reglas de la entidad"""
+        if value is None:
+            if allow_none:
+                return None
+            raise ValueError(f"{field_name} es requerido")
+
+        try:
+            decimal_value = float(value)
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"{field_name} debe ser un número válido: {value}")
+
+        # Validaciones específicas según la entidad
+        if min_value is not None and decimal_value < min_value:
+            if field_name == 'price':
+                raise ValueError("El precio no puede ser negativo")
+            elif field_name == 'checkAmount':
+                raise ValueError("El monto de cheque no puede ser negativo")
+            elif field_name == 'commissionPercentage':
+                raise ValueError(
+                    "El porcentaje de comisión debe estar entre 0 y 100")
+            else:
+                raise ValueError(
+                    f"{field_name} no puede ser menor que {min_value}")
+
+        if max_value is not None and decimal_value > max_value:
+            if field_name == 'commissionPercentage':
+                raise ValueError(
+                    "El porcentaje de comisión debe estar entre 0 y 100")
+            else:
+                raise ValueError(
+                    f"{field_name} no puede ser mayor que {max_value}")
+
+        return decimal_value
+
+    def _validate_integer_field(self, value: Any, field_name: str,
+                                min_value: int = None) -> int:
+        """Valida campos enteros según las reglas de la entidad"""
+        if value is None:
+            raise ValueError(f"{field_name} es requerido")
+
+        try:
+            int_value = int(value)
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"{field_name} debe ser un número entero válido: {value}")
+
+        if min_value is not None and int_value < min_value:
+            if field_name == 'binaryPoints':
+                raise ValueError("Los puntos binarios no pueden ser negativos")
+            else:
+                raise ValueError(
+                    f"{field_name} no puede ser menor que {min_value}")
+
+        return int_value
+
+    def _process_datetime(self, dt_value: Any) -> datetime:
+        """Procesa campos de fecha/hora"""
+        if dt_value is None:
+            return datetime.utcnow()
+
+        if isinstance(dt_value, datetime):
+            return dt_value
+
+        if isinstance(dt_value, str):
+            try:
+                # Intentar parsear diferentes formatos
+                datetime_formats = [
+                    '%Y-%m-%d %H:%M:%S.%f',      # Con microsegundos
+                    '%Y-%m-%d %H:%M:%S',         # Sin microsegundos
+                    '%Y-%m-%dT%H:%M:%S.%fZ',     # ISO format con Z
+                    '%Y-%m-%dT%H:%M:%S.%f',      # ISO format sin Z
+                    '%Y-%m-%dT%H:%M:%S',         # ISO format básico
+                ]
+
+                for fmt in datetime_formats:
+                    try:
+                        return datetime.strptime(dt_value, fmt)
+                    except ValueError:
+                        continue
+
+                logger.warning(
+                    f"No se pudo parsear fecha/hora: {dt_value}, usando fecha actual")
+                return datetime.utcnow()
+
+            except Exception:
+                return datetime.utcnow()
+
+        return datetime.utcnow()
+
+    def validate_transformation(self, transformed_plans: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Valida que la transformación sea correcta"""
+        validation_results = {
+            'valid': True,
+            'errors': [],
+            'warnings': [],
+            'stats': {
+                'total_plans': len(transformed_plans),
+                'unique_ids': 0,
+                'active_plans': 0,
+                'plans_with_products': 0,
+                'plans_with_benefits': 0,
+                'price_range': {'min': None, 'max': None, 'avg': None}
+            }
+        }
+
+        try:
+            ids = set()
+            prices = []
+
+            for plan in transformed_plans:
+                # Validar ID único
+                plan_id = plan['id']
+                if plan_id in ids:
+                    validation_results['errors'].append(
+                        f"ID duplicado: {plan_id}")
+                    validation_results['valid'] = False
+                ids.add(plan_id)
+
+                # Validar campos obligatorios
+                if not plan.get('name'):
+                    validation_results['errors'].append(
+                        f"Plan {plan_id}: nombre requerido")
+                    validation_results['valid'] = False
+
+                # Validar longitudes
+                if len(plan['name']) > 100:
+                    validation_results['errors'].append(
+                        f"Plan {plan_id}: nombre excede 100 caracteres")
+                    validation_results['valid'] = False
+
+                # Validar rangos numéricos
+                if plan['price'] < 0:
+                    validation_results['errors'].append(
+                        f"Plan {plan_id}: precio negativo")
+                    validation_results['valid'] = False
+
+                if plan['check_amount'] < 0:
+                    validation_results['errors'].append(
+                        f"Plan {plan_id}: checkAmount negativo")
+                    validation_results['valid'] = False
+
+                if plan['binary_points'] < 0:
+                    validation_results['errors'].append(
+                        f"Plan {plan_id}: binaryPoints negativo")
+                    validation_results['valid'] = False
+
+                if not (0 <= plan['commission_percentage'] <= 100):
+                    validation_results['errors'].append(
+                        f"Plan {plan_id}: commissionPercentage fuera de rango")
+                    validation_results['valid'] = False
+
+                # Estadísticas
+                if plan['is_active']:
+                    validation_results['stats']['active_plans'] += 1
+
+                if plan['products']:
+                    validation_results['stats']['plans_with_products'] += 1
+
+                if plan['benefits']:
+                    validation_results['stats']['plans_with_benefits'] += 1
+
+                prices.append(plan['price'])
+
+            validation_results['stats']['unique_ids'] = len(ids)
+
+            # Calcular estadísticas de precios
+            if prices:
+                validation_results['stats']['price_range'] = {
+                    'min': min(prices),
+                    'max': max(prices),
+                    'avg': sum(prices) / len(prices)
+                }
+
+            logger.info(
+                f"Validación de transformación: {'EXITOSA' if validation_results['valid'] else 'FALLÓ'}")
+            return validation_results
+
+        except Exception as e:
+            validation_results['valid'] = False
+            validation_results['errors'].append(
+                f"Error en validación: {str(e)}")
+            return validation_results
+
+    def get_transformation_summary(self) -> Dict[str, Any]:
+        """Obtiene un resumen de la transformación"""
+        return {
+            'plans_transformed': self.stats['plans_transformed'],
+            'array_cleanups': self.stats['array_cleanups'],
+            'name_cleanups': self.stats['name_cleanups'],
+            'total_errors': len(self.stats['errors']),
+            'total_warnings': len(self.stats['warnings']),
+            'errors': self.stats['errors'],
+            'warnings': self.stats['warnings']
+        }
