@@ -6,6 +6,8 @@ from .users_loader import UsersLoader
 from .payment_configs_loader import PaymentConfigsLoader
 from .payments_loader import PaymentsLoader
 from .membership_plans_loader import MembershipPlansLoader
+from .memberships_loader import MembershipsLoader
 
 __all__ = ['MongoLoader', 'UsersLoader',
-           'PaymentConfigsLoader', 'PaymentsLoader', 'MembershipPlansLoader']
+           'PaymentConfigsLoader', 'PaymentsLoader', 
+           'MembershipPlansLoader', 'MembershipsLoader']

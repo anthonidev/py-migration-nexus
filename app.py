@@ -49,6 +49,10 @@ class MigrationApp:
             from src.core.membership_plans_migration import main
             return main()
 
+        def migrate_memberships():
+            from src.core.memberships_migration import main
+            return main()
+
         return {
             "ms-users": {
                 "roles-views": migrate_roles_views,
@@ -60,6 +64,7 @@ class MigrationApp:
             },
             "ms-membership": {
                 "membership-plans": migrate_membership_plans,
+                "memberships": migrate_memberships,
             },
             # TODO: Agregar otros microservicios
             # "ms-points": {
@@ -145,7 +150,8 @@ class MigrationApp:
                 "payments": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_PAYMENTS', 'MS_NEXUS_USER']
             },
             "ms-membership": {
-                "membership-plans": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_MEMBERSHIP']
+                "membership-plans": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_MEMBERSHIP'],
+                "memberships": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_MEMBERSHIP', 'MS_NEXUS_USER']
             }
         }
 
@@ -225,6 +231,15 @@ class MigrationApp:
             print("   • Se validarán rangos numéricos según las reglas de la entidad")
             print("   • Los nombres se truncarán a 100 caracteres si es necesario")
             print("   • Se aplicarán todas las validaciones @BeforeInsert/@BeforeUpdate")
+        elif submodule_name == "memberships":
+            print("\n📋 REQUISITOS ESPECÍFICOS PARA MEMBRESÍAS DE USUARIOS:")
+            print("   • Los planes de membresía deben estar migrados previamente")
+            print("   • Los usuarios deben estar migrados en ms-users (MongoDB)")
+            print("   • Se conservarán los IDs originales de membresías, reconsumptions e historial")
+            print("   • Se buscarán usuarios por email para obtener IDs y nombres")
+            print("   • Se migrarán todas las entidades relacionadas (memberships, reconsumptions, history)")
+            print("   • Se validarán fechas de inicio/fin y montos de reconsumo")
+            print("   • Se aplicarán todas las validaciones @BeforeInsert/@BeforeUpdate")
 
         while True:
             confirm = input(
@@ -277,14 +292,16 @@ class MigrationApp:
                     print(
                         "   • Revisa el reporte generado para estadísticas detalladas")
                 elif submodule_name == "membership-plans":
-                    print("\n💡 MIGRACIÓN COMPLETADA:")
-                    print(
-                        "   • Planes de membresía migrados conservando IDs originales")
-                    print("   • Arrays de productos y beneficios limpiados")
-                    print("   • Validaciones de entidad aplicadas correctamente")
+                    print("\n💡 SIGUIENTE PASO RECOMENDADO:")
                     print("   • Ahora puedes migrar las membresías de usuarios")
-                    print(
-                        "   • Revisa el reporte generado para estadísticas detalladas")
+                elif submodule_name == "memberships":
+                    print("\n💡 MIGRACIÓN COMPLETADA:")
+                    print("   • Membresías migradas conservando IDs originales")
+                    print("   • Reconsumptions migrados con referencias correctas")
+                    print("   • Historial migrado manteniendo trazabilidad")
+                    print("   • Usuarios vinculados mediante búsqueda por email")
+                    print("   • Se aplicaron todas las validaciones de entidad")
+                    print("   • Revisa el reporte generado para estadísticas detalladas")
             else:
                 print(f"\n💥 MIGRACIÓN FALLÓ")
                 print(f"❌ Error en {module_name} -> {submodule_name}")

@@ -6,6 +6,8 @@ from .users_extractor import UsersExtractor
 from .payment_configs_extractor import PaymentConfigsExtractor
 from .payments_extractor import PaymentsExtractor
 from .membership_plans_extractor import MembershipPlansExtractor
+from .memberships_extractor import MembershipsExtractor
 
 __all__ = ['RolesViewsExtractor', 'UsersExtractor',
-           'PaymentConfigsExtractor', 'PaymentsExtractor', 'MembershipPlansExtractor']
+           'PaymentConfigsExtractor', 'PaymentsExtractor', 
+           'MembershipPlansExtractor', 'MembershipsExtractor']
