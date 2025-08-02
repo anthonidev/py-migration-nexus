@@ -1,13 +1,9 @@
-"""
-Extractor de datos de pagos desde PostgreSQL
-"""
 from src.utils.logger import get_logger
 from src.connections.postgres_connection import PostgresConnection
 from typing import List, Dict, Any
 import sys
 import os
 
-# Agregar el directorio raíz al path si es necesario
 sys.path.insert(0, os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))
 
@@ -16,13 +12,11 @@ logger = get_logger(__name__)
 
 
 class PaymentsExtractor:
-    """Extractor de datos de pagos desde PostgreSQL"""
 
     def __init__(self):
         self.postgres_conn = PostgresConnection()
 
     def extract_payments_data(self) -> List[Dict[str, Any]]:
-        """Extrae todos los pagos con su información completa"""
         logger.info("Iniciando extracción de pagos desde PostgreSQL")
 
         query = """
@@ -78,7 +72,6 @@ class PaymentsExtractor:
         try:
             results, columns = self.postgres_conn.execute_query(query)
 
-            # Convertir resultados a diccionarios
             payments_data = []
             for row in results:
                 payment_dict = dict(zip(columns, row))
@@ -93,15 +86,12 @@ class PaymentsExtractor:
             raise
 
     def get_extraction_summary(self) -> Dict[str, Any]:
-        """Obtiene un resumen de la extracción"""
         try:
-            # Contar pagos totales
             total_payments_query = "SELECT COUNT(*) FROM payments"
             total_payments_results, _ = self.postgres_conn.execute_query(
                 total_payments_query)
             total_payments = total_payments_results[0][0]
 
-            # Contar por estado
             status_query = """
             SELECT status, COUNT(*) as count 
             FROM payments 
@@ -116,7 +106,6 @@ class PaymentsExtractor:
                 payments_by_status[status_data['status']
                                    ] = status_data['count']
 
-            # Contar por método de pago
             method_query = """
             SELECT "methodPayment", COUNT(*) as count 
             FROM payments 
@@ -131,7 +120,6 @@ class PaymentsExtractor:
                 payments_by_method[method_data['methodPayment']
                                    ] = method_data['count']
 
-            # Contar pagos con configuración válida
             valid_config_query = """
             SELECT COUNT(*) 
             FROM payments p 
@@ -141,7 +129,6 @@ class PaymentsExtractor:
                 valid_config_query)
             payments_with_valid_config = valid_config_results[0][0]
 
-            # Contar pagos con imágenes
             with_images_query = """
             SELECT COUNT(DISTINCT p.id) 
             FROM payments p 
@@ -152,7 +139,6 @@ class PaymentsExtractor:
                 with_images_query)
             payments_with_images = with_images_results[0][0]
 
-            # Contar total de imágenes activas
             total_images_query = """
             SELECT COUNT(*) 
             FROM payment_images 
@@ -181,7 +167,6 @@ class PaymentsExtractor:
             raise
 
     def validate_source_data(self) -> Dict[str, Any]:
-        """Valida la integridad de los datos de origen"""
         logger.info("Validando datos de origen para pagos")
 
         validation_results = {
@@ -191,7 +176,6 @@ class PaymentsExtractor:
         }
 
         try:
-            # Validar que todos los pagos tengan usuarios válidos
             orphan_payments_query = """
             SELECT COUNT(*) 
             FROM payments p 
@@ -207,7 +191,6 @@ class PaymentsExtractor:
                     f"{orphan_payments} pagos sin usuario válido")
                 validation_results['valid'] = False
 
-            # Validar configuraciones de pago
             invalid_config_query = """
             SELECT COUNT(*) 
             FROM payments p 
@@ -223,7 +206,6 @@ class PaymentsExtractor:
                     f"{invalid_configs} pagos con configuración inválida")
                 validation_results['valid'] = False
 
-            # Validar montos
             invalid_amounts_query = """
             SELECT COUNT(*) 
             FROM payments 
@@ -238,7 +220,6 @@ class PaymentsExtractor:
                     f"{invalid_amounts} pagos con montos inválidos")
                 validation_results['valid'] = False
 
-            # Validar estados rechazados sin razón
             rejected_no_reason_query = """
             SELECT COUNT(*) 
             FROM payments 
@@ -252,7 +233,6 @@ class PaymentsExtractor:
                 validation_results['warnings'].append(
                     f"{rejected_no_reason} pagos rechazados sin razón")
 
-            # Validar revisores para pagos revisados
             reviewed_no_reviewer_query = """
             SELECT COUNT(*) 
             FROM payments 
@@ -278,5 +258,4 @@ class PaymentsExtractor:
             return validation_results
 
     def close_connection(self):
-        """Cierra la conexión a PostgreSQL"""
         self.postgres_conn.disconnect()

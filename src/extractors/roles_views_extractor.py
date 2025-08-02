@@ -1,11 +1,7 @@
-"""
-Extractor de datos de roles y vistas desde PostgreSQL
-"""
 from typing import List, Dict, Any
 import sys
 import os
 
-# Agregar el directorio raíz al path si es necesario
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from src.connections.postgres_connection import PostgresConnection
@@ -14,13 +10,11 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 class RolesViewsExtractor:
-    """Extractor de datos de roles y vistas desde PostgreSQL"""
     
     def __init__(self):
         self.postgres_conn = PostgresConnection()
     
     def extract_roles_and_views(self) -> List[Dict[str, Any]]:
-        """Extrae todos los roles con sus vistas asociadas"""
         logger.info("Iniciando extracción de roles con vistas desde PostgreSQL")
         
         query = """
@@ -69,7 +63,6 @@ class RolesViewsExtractor:
         try:
             results, columns = self.postgres_conn.execute_query(query)
             
-            # Convertir resultados a diccionarios
             roles_data = []
             for row in results:
                 role_dict = dict(zip(columns, row))
@@ -83,7 +76,6 @@ class RolesViewsExtractor:
             raise
     
     def extract_all_views(self) -> List[Dict[str, Any]]:
-        """Extrae todas las vistas de la base de datos"""
         logger.info("Iniciando extracción de todas las vistas desde PostgreSQL")
         
         query = """
@@ -108,7 +100,6 @@ class RolesViewsExtractor:
         try:
             results, columns = self.postgres_conn.execute_query(query)
             
-            # Convertir resultados a diccionarios
             views_data = []
             for row in results:
                 view_dict = dict(zip(columns, row))
@@ -122,7 +113,6 @@ class RolesViewsExtractor:
             raise
     
     def extract_role_view_relationships(self) -> List[Dict[str, Any]]:
-        """Extrae las relaciones entre roles y vistas"""
         logger.info("Extrayendo relaciones role-view desde PostgreSQL")
         
         query = """
@@ -142,7 +132,6 @@ class RolesViewsExtractor:
         try:
             results, columns = self.postgres_conn.execute_query(query)
             
-            # Convertir resultados a diccionarios
             relationships = []
             for row in results:
                 rel_dict = dict(zip(columns, row))
@@ -156,7 +145,6 @@ class RolesViewsExtractor:
             raise
     
     def get_extraction_summary(self) -> Dict[str, Any]:
-        """Obtiene un resumen de la extracción"""
         try:
             # Contar roles
             roles_count_query = "SELECT COUNT(*) FROM public.roles WHERE \"isActive\" = true"
@@ -203,5 +191,4 @@ class RolesViewsExtractor:
             raise
     
     def close_connection(self):
-        """Cierra la conexión a PostgreSQL"""
         self.postgres_conn.disconnect()

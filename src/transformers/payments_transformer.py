@@ -125,27 +125,22 @@ class PaymentsTransformer:
 
         for item in items_data:
             try:
-                # CONSERVAR EL ID ORIGINAL DEL ITEM
                 original_item_id = item.get('id')
                 if not original_item_id:
                     logger.warning(
                         f"Item del pago {payment_id} sin ID original, se omitirá")
                     continue
 
-                # Determinar tipo de item
                 item_type = self._determine_item_type(item, payment_method)
 
-                # Procesar URL
                 url = item.get('url')
                 if url and url.strip():
                     url = url.strip()
                 else:
                     url = None
 
-                # urlKey siempre None como especificaste
                 url_key = None
 
-                # pointsTransactionId desde transactionReference
                 points_transaction_id = None
                 if item.get('transactionReference'):
                     points_transaction_id = self._clean_text_field(
@@ -154,11 +149,9 @@ class PaymentsTransformer:
                         uppercase=True
                     )
 
-                # Procesar fecha de transacción
                 transaction_date = self._process_datetime(
                     item.get('transactionDate'))
 
-                # Validar que tenga al menos imagen o referencia de transacción
                 has_image_data = url is not None
                 has_transaction_data = points_transaction_id is not None
 
@@ -191,7 +184,6 @@ class PaymentsTransformer:
         return transformed_items
 
     def _get_user_info(self, email: str) -> Optional[Dict[str, Any]]:
-        """Obtiene información del usuario usando el servicio compartido"""
         if not email:
             return None
 
@@ -212,7 +204,6 @@ class PaymentsTransformer:
             return None
 
     def _map_payment_method(self, method: str) -> str:
-        """Mapea el método de pago al enum correspondiente"""
         if not method:
             return 'VOUCHER'  # Valor por defecto
 
@@ -240,13 +231,11 @@ class PaymentsTransformer:
         return mapped_method
 
     def _map_payment_status(self, status: str) -> str:
-        """Mapea el estado del pago al enum correspondiente"""
         if not status:
-            return 'PENDING'  # Valor por defecto
+            return 'PENDING'  
 
         status_upper = status.upper().strip()
 
-        # Mapeo de estados conocidos
         status_mapping = {
             'PENDING': 'PENDING',
             'PENDIENTE': 'PENDING',
@@ -271,24 +260,19 @@ class PaymentsTransformer:
         return mapped_status
 
     def _determine_item_type(self, item_data: Dict[str, Any], payment_method: str) -> str:
-        """Determina el tipo de item según la lógica especificada"""
 
-        # Si es pago con puntos o tiene referencia de transacción de puntos
         if (payment_method == 'POINTS' or
             (item_data.get('transactionReference') and
              'Puntos' in str(item_data.get('transactionReference', '')))):
             return 'POINTS_TRANSACTION'
 
-        # Por defecto, es imagen de voucher
         return 'VOUCHER_IMAGE'
 
     def _extract_bank_info_from_items(self, items_data: List[Dict[str, Any]]) -> Tuple[Optional[str], Optional[datetime]]:
-        """Extrae información bancaria del primer item disponible"""
 
         if not items_data:
             return None, None
 
-        # Si items_data es un string JSON, parsearlo
         if isinstance(items_data, str):
             try:
                 items_data = json.loads(items_data)
@@ -298,7 +282,6 @@ class PaymentsTransformer:
         if not items_data or not isinstance(items_data, list):
             return None, None
 
-        # Tomar información del primer item
         first_item = items_data[0]
 
         bank_name = self._clean_text_field(first_item.get('bankName'))
@@ -308,7 +291,6 @@ class PaymentsTransformer:
         return bank_name, operation_date
 
     def _clean_text_field(self, text: str, max_length: int = None, uppercase: bool = False) -> Optional[str]:
-        """Limpia campos de texto según las reglas de la entidad"""
         if not text or not str(text).strip():
             return None
 
@@ -326,7 +308,6 @@ class PaymentsTransformer:
         return cleaned if cleaned else None
 
     def _process_metadata(self, metadata: Any) -> Optional[Dict[str, Any]]:
-        """Procesa y valida el campo metadata"""
         if not metadata:
             return None
 
@@ -376,7 +357,6 @@ class PaymentsTransformer:
         return None
 
     def validate_transformation(self, payments: List[Dict[str, Any]], payment_items: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Valida que la transformación sea correcta"""
         validation_results = {
             'valid': True,
             'errors': [],
@@ -444,16 +424,13 @@ class PaymentsTransformer:
                     validation_results['stats']['payments_by_method'].get(
                         method, 0) + 1
 
-            # Validar payment items
             for item in payment_items:
-                # Validar que tenga pago asociado
                 if item['payment_id'] not in payment_ids:
                     validation_results['errors'].append(
                         f"Item referencia pago inexistente: {item['payment_id']}"
                     )
                     validation_results['valid'] = False
 
-                # Validar que tenga al menos imagen o referencia
                 has_image = item.get('url') is not None
                 has_transaction = item.get('points_transaction_id') is not None
 
@@ -462,7 +439,6 @@ class PaymentsTransformer:
                         f"Item del pago {item['payment_id']} sin imagen ni referencia de transacción"
                     )
 
-                # Contar por tipo
                 item_type = item.get('item_type', 'UNKNOWN')
                 validation_results['stats']['items_by_type'][item_type] = \
                     validation_results['stats']['items_by_type'].get(
@@ -479,7 +455,6 @@ class PaymentsTransformer:
             return validation_results
 
     def get_transformation_summary(self) -> Dict[str, Any]:
-        """Obtiene un resumen de la transformación"""
         return {
             'payments_transformed': self.stats['payments_transformed'],
             'payment_items_transformed': self.stats['payment_items_transformed'],
@@ -492,7 +467,6 @@ class PaymentsTransformer:
         }
 
     def close_connections(self):
-        """Cierra las conexiones de servicios"""
         try:
             self.user_service.close_connection()
         except Exception as e:

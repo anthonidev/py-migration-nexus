@@ -1,6 +1,3 @@
-"""
-Script principal de migración de pagos desde PostgreSQL monolito a ms-payments
-"""
 from src.utils.logger import get_logger
 from src.loaders.payments_loader import PaymentsLoader
 from src.transformers.payments_transformer import PaymentsTransformer
@@ -9,7 +6,6 @@ import os
 import sys
 from datetime import datetime
 
-# Agregar el directorio raíz al path si es necesario
 sys.path.insert(0, os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))
 
@@ -18,7 +14,6 @@ logger = get_logger(__name__)
 
 
 def main():
-    """Función principal de migración de pagos"""
 
     try:
         logger.info("🚀 === INICIANDO MIGRACIÓN DE PAGOS ===")

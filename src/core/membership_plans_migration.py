@@ -1,6 +1,3 @@
-"""
-Script principal de migración de planes de membresía desde PostgreSQL monolito a ms-membership
-"""
 from src.utils.logger import get_logger
 from src.loaders.membership_plans_loader import MembershipPlansLoader
 from src.transformers.membership_plans_transformer import MembershipPlansTransformer
@@ -9,7 +6,6 @@ import os
 import sys
 from datetime import datetime
 
-# Agregar el directorio raíz al path si es necesario
 sys.path.insert(0, os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))
 
@@ -18,13 +14,11 @@ logger = get_logger(__name__)
 
 
 def main():
-    """Función principal de migración de planes de membresía"""
 
     try:
         logger.info("🚀 === INICIANDO MIGRACIÓN DE PLANES DE MEMBRESÍA ===")
         start_time = datetime.now()
 
-        # 1. VALIDACIÓN PREVIA
         logger.info("🔍 PASO 1: Validando datos de origen")
         extractor = MembershipPlansExtractor()
 
@@ -265,22 +259,18 @@ def test_connections():
 
 
 if __name__ == "__main__":
-    # Cargar variables de entorno desde .env si existe
     try:
         from dotenv import load_dotenv
         load_dotenv()
     except ImportError:
         pass
 
-    # Validar entorno
     if not validate_environment():
         sys.exit(1)
 
-    # Probar conexiones
     if not test_connections():
         sys.exit(1)
 
-    # Ejecutar migración
     success = main()
 
     if success:

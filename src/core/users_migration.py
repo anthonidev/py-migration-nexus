@@ -1,11 +1,8 @@
-"""
-Script principal de migración de usuarios desde PostgreSQL a MongoDB
-"""
+
 import os
 import sys
 from datetime import datetime
 
-# Agregar el directorio raíz al path si es necesario
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from src.extractors.users_extractor import UsersExtractor
@@ -17,7 +14,6 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 def main():
-    """Función principal de migración de usuarios"""
     
     try:
         logger.info("🚀 === INICIANDO MIGRACIÓN DE USUARIOS ===")

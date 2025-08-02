@@ -8,7 +8,6 @@ logger = get_logger(__name__)
 
 
 class MembershipPostgresConnection:
-    """Conexión a PostgreSQL para ms-membership"""
 
     def __init__(self):
         self.connection = None

@@ -40,10 +40,8 @@ class PaymentConfigsTransformer:
 
     def _transform_single_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
 
-        # Mantener el ID original (muy importante según requisitos)
         original_id = config['id']
 
-        # Transformar y limpiar el código según las reglas de validación de la entidad
         original_code = config.get('code', '')
         transformed_code = self._transform_code(original_code)
 
@@ -54,17 +52,13 @@ class PaymentConfigsTransformer:
                 'transformed': transformed_code
             })
 
-        # Transformar y limpiar nombre
         name = self._clean_text_field(config.get('name', ''), 100, 'name')
 
-        # Transformar y limpiar descripción
         description = self._clean_text_field(
             config.get('description', ''), 500, 'description')
 
-        # Procesar isActive
         is_active = bool(config.get('isActive', True))
 
-        # Procesar fechas
         created_at = self._process_datetime(config.get('createdAt'))
         updated_at = self._process_datetime(config.get('updatedAt'))
 
@@ -84,17 +78,12 @@ class PaymentConfigsTransformer:
         if not code:
             raise ValueError("Código no puede estar vacío")
 
-        # Aplicar transformaciones según @BeforeInsert/@BeforeUpdate
-        # 1. Convertir a mayúsculas
-        # 2. Quitar espacios al inicio y final
-        # 3. Reemplazar espacios múltiples con guión bajo
+     
         transformed = code.upper().strip()
 
-        # Reemplazar espacios múltiples con un solo guión bajo
         import re
         transformed = re.sub(r'\s+', '_', transformed)
 
-        # Validar longitud máxima (50 caracteres según la entidad)
         if len(transformed) > 50:
             warning = f"Código '{transformed}' excede 50 caracteres, será truncado"
             logger.warning(warning)
@@ -104,11 +93,9 @@ class PaymentConfigsTransformer:
         return transformed
 
     def _clean_text_field(self, text: str, max_length: int, field_name: str) -> str:
-        """Limpia campos de texto según las reglas de la entidad"""
         if not text:
             return ''
 
-        # Quitar espacios al inicio y final
         cleaned = text.strip()
 
         # Validar longitud máxima
@@ -155,7 +142,6 @@ class PaymentConfigsTransformer:
         return datetime.utcnow()
 
     def validate_transformation(self, transformed_configs: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Valida que la transformación sea correcta"""
         validation_results = {
             'valid': True,
             'errors': [],

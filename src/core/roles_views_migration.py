@@ -11,7 +11,6 @@ from ..validators.migration_validator import MigrationValidator
 from ..utils.logger import get_logger
 
 def main():
-    """Función principal de migración"""
     logger = get_logger(__name__)
     
     try:

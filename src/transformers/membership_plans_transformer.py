@@ -1,6 +1,3 @@
-"""
-Transformador de datos de planes de membresía para PostgreSQL ms-membership
-"""
 from typing import List, Dict, Any
 from datetime import datetime
 from src.utils.logger import get_logger
@@ -9,7 +6,6 @@ logger = get_logger(__name__)
 
 
 class MembershipPlansTransformer:
-    """Transformador de datos de planes de membresía para PostgreSQL ms-membership"""
 
     def __init__(self):
         self.stats = {
@@ -21,15 +17,7 @@ class MembershipPlansTransformer:
         }
 
     def transform_membership_plans(self, plans_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Transforma los datos de planes de membresía para ms-membership
-
-        Args:
-            plans_data: Lista de planes desde PostgreSQL origen
-
-        Returns:
-            Lista de planes transformados
-        """
+       
         logger.info(
             f"Iniciando transformación de {len(plans_data)} planes de membresía")
 
@@ -51,15 +39,11 @@ class MembershipPlansTransformer:
         return transformed_plans
 
     def _transform_single_plan(self, plan: Dict[str, Any]) -> Dict[str, Any]:
-        """Transforma un plan individual según las reglas de la entidad"""
 
-        # Conservar el ID original (muy importante)
         original_id = plan['id']
 
-        # Transformar y limpiar nombre
         name = self._clean_name(plan.get('name', ''))
 
-        # Validar y transformar campos numéricos
         price = self._validate_decimal_field(
             plan.get('price'), 'price', min_value=0.0)
         check_amount = self._validate_decimal_field(
@@ -70,22 +54,18 @@ class MembershipPlansTransformer:
             plan.get('commissionPercentage'), 'commissionPercentage',
             min_value=0.0, max_value=100.0)
 
-        # directCommissionAmount puede ser None
         direct_commission_amount = None
         if plan.get('directCommissionAmount') is not None:
             direct_commission_amount = self._validate_decimal_field(
                 plan.get('directCommissionAmount'), 'directCommissionAmount',
                 allow_none=True)
 
-        # Limpiar y validar arrays
         products = self._clean_array_field(plan.get('products', []))
         benefits = self._clean_array_field(plan.get('benefits', []))
 
-        # Campos booleanos y de orden
         is_active = bool(plan.get('isActive', True))
         display_order = int(plan.get('displayOrder', 0))
 
-        # Procesar fechas
         created_at = self._process_datetime(plan.get('createdAt'))
         updated_at = self._process_datetime(plan.get('updatedAt'))
 
@@ -108,17 +88,14 @@ class MembershipPlansTransformer:
         return transformed_plan
 
     def _clean_name(self, name: str) -> str:
-        """Limpia el nombre del plan según @BeforeInsert/@BeforeUpdate"""
         if not name:
             raise ValueError("El nombre es requerido y no puede estar vacío")
 
-        # Aplicar trim como indica la entidad
         cleaned_name = name.strip()
 
         if not cleaned_name:
             raise ValueError("El nombre no puede estar vacío después del trim")
 
-        # Validar longitud máxima (100 caracteres)
         if len(cleaned_name) > 100:
             warning = f"Nombre '{cleaned_name}' excede 100 caracteres, será truncado"
             logger.warning(warning)
@@ -129,16 +106,12 @@ class MembershipPlansTransformer:
         return cleaned_name
 
     def _clean_array_field(self, array_field: List[str]) -> List[str]:
-        """Limpia arrays eliminando elementos vacíos según @BeforeInsert/@BeforeUpdate"""
         if not array_field:
             return []
 
         if not isinstance(array_field, list):
-            # Si viene como string (formato PostgreSQL de array), convertir
             if isinstance(array_field, str):
-                # Procesar formato PostgreSQL array: {item1,item2,item3}
                 if array_field.startswith('{') and array_field.endswith('}'):
-                    # Remover llaves y dividir por comas
                     items = array_field[1:-1].split(',')
                     array_field = [item.strip()
                                    for item in items if item.strip()]
@@ -147,7 +120,6 @@ class MembershipPlansTransformer:
             else:
                 return []
 
-        # Limpiar elementos según las reglas de la entidad
         cleaned_array = []
         for item in array_field:
             if item and str(item).strip():
@@ -163,7 +135,6 @@ class MembershipPlansTransformer:
     def _validate_decimal_field(self, value: Any, field_name: str,
                                 min_value: float = None, max_value: float = None,
                                 allow_none: bool = False) -> float:
-        """Valida campos decimales según las reglas de la entidad"""
         if value is None:
             if allow_none:
                 return None
@@ -200,7 +171,6 @@ class MembershipPlansTransformer:
 
     def _validate_integer_field(self, value: Any, field_name: str,
                                 min_value: int = None) -> int:
-        """Valida campos enteros según las reglas de la entidad"""
         if value is None:
             raise ValueError(f"{field_name} es requerido")
 
@@ -254,7 +224,6 @@ class MembershipPlansTransformer:
         return datetime.utcnow()
 
     def validate_transformation(self, transformed_plans: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Valida que la transformación sea correcta"""
         validation_results = {
             'valid': True,
             'errors': [],
@@ -348,7 +317,6 @@ class MembershipPlansTransformer:
             return validation_results
 
     def get_transformation_summary(self) -> Dict[str, Any]:
-        """Obtiene un resumen de la transformación"""
         return {
             'plans_transformed': self.stats['plans_transformed'],
             'array_cleanups': self.stats['array_cleanups'],

@@ -1,11 +1,7 @@
-"""
-Extractor de datos de usuarios desde PostgreSQL
-"""
 from typing import List, Dict, Any
 import sys
 import os
 
-# Agregar el directorio raíz al path si es necesario
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from src.connections.postgres_connection import PostgresConnection
@@ -14,13 +10,11 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 class UsersExtractor:
-    """Extractor de datos de usuarios desde PostgreSQL"""
     
     def __init__(self):
         self.postgres_conn = PostgresConnection()
     
     def extract_users_data(self) -> List[Dict[str, Any]]:
-        """Extrae todos los usuarios con su información completa"""
         logger.info("Iniciando extracción de usuarios desde PostgreSQL")
         
         query = """
@@ -63,7 +57,6 @@ class UsersExtractor:
         try:
             results, columns = self.postgres_conn.execute_query(query)
             
-            # Convertir resultados a diccionarios
             users_data = []
             for row in results:
                 user_dict = dict(zip(columns, row))
@@ -77,7 +70,6 @@ class UsersExtractor:
             raise
     
     def extract_user_hierarchy_relationships(self) -> List[Dict[str, Any]]:
-        """Extrae las relaciones jerárquicas entre usuarios"""
         logger.info("Extrayendo relaciones jerárquicas de usuarios")
         
         query = """

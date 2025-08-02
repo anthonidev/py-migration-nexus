@@ -1,28 +1,21 @@
-"""
-Extractor de datos de planes de membresía desde PostgreSQL
-"""
 from src.utils.logger import get_logger
 from src.connections.postgres_connection import PostgresConnection
 from typing import List, Dict, Any
 import sys
 import os
 
-# Agregar el directorio raíz al path si es necesario
 sys.path.insert(0, os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))
 
 
 logger = get_logger(__name__)
 
-
 class MembershipPlansExtractor:
-    """Extractor de datos de planes de membresía desde PostgreSQL"""
 
     def __init__(self):
         self.postgres_conn = PostgresConnection()
 
     def extract_membership_plans(self) -> List[Dict[str, Any]]:
-        """Extrae todos los planes de membresía desde PostgreSQL"""
         logger.info(
             "Iniciando extracción de planes de membresía desde PostgreSQL")
 

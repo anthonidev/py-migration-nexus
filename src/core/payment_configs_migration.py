@@ -7,7 +7,6 @@ import os
 import sys
 from datetime import datetime
 
-# Agregar el directorio raíz al path si es necesario
 sys.path.insert(0, os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))
 
