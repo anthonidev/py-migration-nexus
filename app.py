@@ -1,457 +1,146 @@
-#!/usr/bin/env python3
-"""
-Aplicación principal de migración de monolito a microservicios
-"""
-from src.utils.logger import get_logger
 import os
 import sys
-from typing import Dict, List, Callable
+from rich.console import Console
 
-# Agregar el directorio raíz del proyecto al path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Cargar variables de entorno
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
     pass
 
+from src.ui.components import UIComponents
+from src.core.migration_controller import MigrationController
+from src.utils.logger import get_logger
+
+console = Console()
 logger = get_logger(__name__)
 
-
 class MigrationApp:
-    """Aplicación principal para gestionar migraciones"""
 
     def __init__(self):
-        self.modules = self._initialize_modules()
+        self.controller = MigrationController()
+        self.ui = UIComponents()
 
-    def _initialize_modules(self) -> Dict[str, Dict[str, Callable]]:
-        """Inicializa los módulos y submódulos disponibles"""
-        # Importar dinámicamente para evitar errores de importación al inicio
-        def migrate_roles_views():
-            from src.core.roles_views_migration import main
-            return main()
-
-        def migrate_users():
-            from src.core.users_migration import main
-            return main()
-
-        def migrate_payment_configs():
-            from src.core.payment_configs_migration import main
-            return main()
-
-        def migrate_payments():
-            from src.core.payments_migration import main
-            return main()
-
-        def migrate_membership_plans():
-            from src.core.membership_plans_migration import main
-            return main()
-
-        def migrate_memberships():
-            from src.core.memberships_migration import main
-            return main()
-        
-        def migrate_user_points():
-            from src.core.user_points_migration import main
-            return main()
-        
-        def migrate_weekly_volumes():
-            from src.core.weekly_volumes_migration import main
-            return main()
-
-        return {
-            "ms-users": {
-                "roles-views": migrate_roles_views,
-                "users": migrate_users,
-            },
-            "ms-payments": {
-                "payment-configs": migrate_payment_configs,
-                "payments": migrate_payments,
-            },
-            "ms-membership": {
-                "membership-plans": migrate_membership_plans,
-                "memberships": migrate_memberships,
-            },
-            "ms-points": {
-                "user-points": migrate_user_points,
-                "weekly-volumes": migrate_weekly_volumes,
-            },
-            # TODO: Agregar otros microservicios
-            # "ms-orders": {
-            #     "orders": migrate_orders,
-            # }
-        }
-
-    def display_banner(self):
-        """Muestra el banner de la aplicación"""
-        print("""
-╔══════════════════════════════════════════════════════════════════╗
-║                    🚀 NEXUS MIGRATION TOOL 🚀                   ║
-║              Migración de Monolito a Microservicios             ║
-╚══════════════════════════════════════════════════════════════════╝
-        """)
-
-    def display_modules(self):
-        """Muestra los módulos disponibles"""
-        print("\n📦 MÓDULOS DISPONIBLES:")
-        print("=" * 50)
-
-        for i, (module_name, submodules) in enumerate(self.modules.items(), 1):
-            status = "✅ Disponible" if submodules else "🚧 En desarrollo"
-            print(f"{i}. {module_name} - {status}")
-
-            if submodules:
-                for j, submodule_name in enumerate(submodules.keys(), 1):
-                    print(f"   {i}.{j} {submodule_name}")
-
-        print(f"{len(self.modules) + 1}. 🚪 Salir")
-
-    def display_submodules(self, module_name: str):
-        """Muestra los submódulos de un módulo específico"""
-        submodules = self.modules.get(module_name, {})
-
-        if not submodules:
-            print(f"\n⚠️  No hay submódulos disponibles para {module_name}")
-            return
-
-        print(f"\n📋 SUBMÓDULOS DE {module_name.upper()}:")
-        print("=" * 50)
-
-        for i, submodule_name in enumerate(submodules.keys(), 1):
-            print(f"{i}. {submodule_name}")
-
-        print(f"{len(submodules) + 1}. ⬅️  Volver al menú principal")
-
-    def validate_environment(self) -> bool:
-        """Valida que las variables de entorno necesarias estén configuradas"""
-        required_vars = ['NEXUS_POSTGRES_URL']
-        missing_vars = []
-
-        for var in required_vars:
-            if not os.getenv(var):
-                missing_vars.append(var)
-
-        if missing_vars:
-            print("\n❌ VARIABLES DE ENTORNO FALTANTES:")
-            for var in missing_vars:
-                print(f"   - {var}")
-            print("\n💡 Configura las variables en tu archivo .env:")
-            print("   NEXUS_POSTGRES_URL=postgresql://user:pass@host:port/db")
-            print("   MS_NEXUS_USER=mongodb://user:pass@host:port/db")
-            print("   MS_NEXUS_PAYMENTS=postgresql://user:pass@host:port/db")
-            print("   MS_NEXUS_MEMBERSHIP=postgresql://user:pass@host:port/db")
-            print("   MS_NEXUS_POINTS=postgresql://user:pass@host:port/db")
-            return False
-
-        print("✅ Variables de entorno básicas configuradas correctamente")
-        return True
-
-    def validate_specific_environment(self, module_name: str, submodule_name: str) -> bool:
-        """Valida variables de entorno específicas para cada migración"""
-        module_requirements = {
-            "ms-users": {
-                "roles-views": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_USER'],
-                "users": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_USER']
-            },
-            "ms-payments": {
-                "payment-configs": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_PAYMENTS'],
-                "payments": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_PAYMENTS', 'MS_NEXUS_USER']
-            },
-            "ms-membership": {
-                "membership-plans": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_MEMBERSHIP'],
-                "memberships": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_MEMBERSHIP', 'MS_NEXUS_USER']
-            },
-            "ms-points": {
-                "user-points": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_POINTS', 'MS_NEXUS_USER', 'MS_NEXUS_PAYMENTS'],
-                "weekly-volumes": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_POINTS', 'MS_NEXUS_USER']
-            }
-        }
-
-        required_vars = module_requirements.get(
-            module_name, {}).get(submodule_name, [])
-        missing_vars = []
-
-        for var in required_vars:
-            if not os.getenv(var):
-                missing_vars.append(var)
-
-        if missing_vars:
-            print(
-                f"\n❌ VARIABLES FALTANTES PARA {module_name} -> {submodule_name}:")
-            for var in missing_vars:
-                print(f"   - {var}")
-            return False
-
-        return True
-
-    def get_user_choice(self, options_count: int) -> int:
-        """Obtiene la elección del usuario"""
-        while True:
-            try:
-                choice = input(
-                    f"\n🎯 Selecciona una opción (1-{options_count}): ").strip()
-                choice_num = int(choice)
-
-                if 1 <= choice_num <= options_count:
-                    return choice_num
-                else:
-                    print(
-                        f"❌ Por favor, ingresa un número entre 1 y {options_count}")
-
-            except ValueError:
-                print("❌ Por favor, ingresa un número válido")
-            except KeyboardInterrupt:
-                print("\n\n👋 ¡Hasta luego!")
-                sys.exit(0)
-
-    def confirm_migration(self, module_name: str, submodule_name: str) -> bool:
-        """Confirma la migración antes de ejecutarla"""
-        print(f"\n⚠️  CONFIRMACIÓN DE MIGRACIÓN")
-        print("=" * 50)
-        print(f"📦 Módulo: {module_name}")
-        print(f"📋 Submódulo: {submodule_name}")
-        print("\n🚨 ADVERTENCIA: Esta operación:")
-        print("   • Eliminará datos existentes en el destino")
-        print("   • Migrará datos desde la base origen")
-        print("   • Puede tomar varios minutos")
-
-        # Advertencias específicas por tipo de migración
-        if submodule_name == "users":
-            print("\n📋 REQUISITOS ESPECÍFICOS PARA USUARIOS:")
-            print("   • Los roles y vistas deben estar migrados previamente")
-            print(
-                "   • Se generarán documentos aleatorios para usuarios sin documentNumber")
-            print("   • Se establecerán relaciones jerárquicas padre-hijo")
-        elif submodule_name == "payment-configs":
-            print("\n📋 REQUISITOS ESPECÍFICOS PARA CONFIGURACIONES DE PAGO:")
-            print("   • Se conservarán los IDs originales de las configuraciones")
-            print(
-                "   • Los códigos se transformarán a mayúsculas y se reemplazarán espacios")
-            print("   • Se validarán longitudes de campos según la nueva entidad")
-        elif submodule_name == "payments":
-            print("\n📋 REQUISITOS ESPECÍFICOS PARA PAGOS:")
-            print("   • Las configuraciones de pago deben estar migradas previamente")
-            print("   • Los usuarios deben estar migrados en ms-users (MongoDB)")
-            print("   • Se conservarán los IDs originales de los pagos")
-            print("   • Se buscarán usuarios por email para obtener IDs y nombres")
-            print("   • Se transformarán métodos y estados de pago según nuevos enums")
-        elif submodule_name == "membership-plans":
-            print("\n📋 REQUISITOS ESPECÍFICOS PARA PLANES DE MEMBRESÍA:")
-            print("   • Se conservarán los IDs originales de los planes")
-            print(
-                "   • Se limpiarán arrays de productos y beneficios eliminando elementos vacíos")
-            print("   • Se validarán rangos numéricos según las reglas de la entidad")
-            print("   • Los nombres se truncarán a 100 caracteres si es necesario")
-            print("   • Se aplicarán todas las validaciones @BeforeInsert/@BeforeUpdate")
-        elif submodule_name == "memberships":
-            print("\n📋 REQUISITOS ESPECÍFICOS PARA MEMBRESÍAS DE USUARIOS:")
-            print("   • Los planes de membresía deben estar migrados previamente")
-            print("   • Los usuarios deben estar migrados en ms-users (MongoDB)")
-            print("   • Se conservarán los IDs originales de membresías, reconsumptions e historial")
-            print("   • Se buscarán usuarios por email para obtener IDs y nombres")
-            print("   • Se migrarán todas las entidades relacionadas (memberships, reconsumptions, history)")
-            print("   • Se validarán fechas de inicio/fin y montos de reconsumo")
-            print("   • Se aplicarán todas las validaciones @BeforeInsert/@BeforeUpdate")
-        elif submodule_name == "user-points":
-            print("\n📋 REQUISITOS ESPECÍFICOS PARA PUNTOS DE USUARIOS:")
-            print("   • Los usuarios deben estar migrados en ms-users (MongoDB)")
-            print("   • Los pagos deben estar migrados en ms-payments (PostgreSQL)")
-            print("   • Se conservarán los IDs originales de user_points, transactions y transaction_payments")
-            print("   • Se buscarán usuarios por email para obtener IDs y nombres")
-            print("   • Se migrarán todas las entidades relacionadas (user_points, transactions, transaction_payments)")
-            print("   • Se validarán consistencias de puntos ganados vs retirados")
-            print("   • Se aplicarán todas las validaciones @BeforeInsert/@BeforeUpdate")
-        elif submodule_name == "weekly-volumes":
-            print("\n📋 REQUISITOS ESPECÍFICOS PARA VOLÚMENES SEMANALES:")
-            print("   • Los usuarios deben estar migrados en ms-users (MongoDB)")
-            print("   • Se conservarán los IDs originales de weekly_volumes y weekly_volume_history")
-            print("   • Se buscarán usuarios por email para obtener IDs y nombres")
-            print("   • Se migrarán todas las entidades relacionadas (weekly_volumes, weekly_volume_history)")
-            print("   • Se validarán fechas de semana (inicio < fin)")
-            print("   • Se validarán volúmenes no negativos")
-            print("   • Se mapearán estados (PENDING, PROCESSED, CANCELLED)")
-            print("   • Se mapearán lados de volumen (LEFT, RIGHT)")
-            print("   • Se aplicarán todas las validaciones @BeforeInsert/@BeforeUpdate")
-
-        while True:
-            confirm = input(
-                "\n¿Estás seguro de continuar? (s/N): ").strip().lower()
-
-            if confirm in ['s', 'si', 'sí', 'y', 'yes']:
-                return True
-            elif confirm in ['n', 'no', ''] or not confirm:
-                return False
-            else:
-                print("❌ Por favor responde 's' para sí o 'n' para no")
-
-    def execute_migration(self, module_name: str, submodule_name: str) -> bool:
-        """Ejecuta la migración seleccionada"""
-        # Validar variables de entorno específicas
-        if not self.validate_specific_environment(module_name, submodule_name):
-            print("❌ No se puede continuar sin las variables de entorno específicas")
-            return False
-
-        migration_func = self.modules[module_name][submodule_name]
-
-        print(f"\n🚀 INICIANDO MIGRACIÓN: {module_name} -> {submodule_name}")
-        print("=" * 60)
-
+    def run(self):
         try:
-            success = migration_func()
+            if not self._check_basic_env():
+                return False
 
-            if success:
-                print(f"\n🎉 ¡MIGRACIÓN COMPLETADA EXITOSAMENTE!")
-                print(
-                    f"✅ {module_name} -> {submodule_name} migrado correctamente")
+            while True:
+                self._show_main_menu()
+                
+                choice = self.ui.get_choice(
+                    "Selecciona un módulo",
+                    len(self.controller.get_modules()) + 1
+                )
+                
+                if choice == len(self.controller.get_modules()) + 1:
+                    console.print("👋 ¡Hasta luego!", style="bold yellow")
+                    break
+                
+                module_names = list(self.controller.get_modules().keys())
+                selected_module = module_names[choice - 1]
+                
+                if not self.controller.get_modules()[selected_module]:
+                    self.ui.info(f"{selected_module} está en desarrollo")
+                    self.ui.wait()
+                    continue
+                
+                self._handle_submodules(selected_module)
 
-                # Consejos post-migración
-                if submodule_name == "roles-views":
-                    print("\n💡 SIGUIENTE PASO RECOMENDADO:")
-                    print("   • Ahora puedes migrar los usuarios")
-                elif submodule_name == "users":
-                    print("\n💡 MIGRACIÓN COMPLETADA:")
-                    print("   • Usuarios migrados con sus relaciones jerárquicas")
-                    print(
-                        "   • Revisa el reporte generado para estadísticas detalladas")
-                elif submodule_name == "payment-configs":
-                    print("\n💡 SIGUIENTE PASO RECOMENDADO:")
-                    print("   • Ahora puedes migrar los pagos de usuarios")
-                elif submodule_name == "payments":
-                    print("\n💡 MIGRACIÓN COMPLETADA:")
-                    print("   • Pagos migrados conservando IDs originales")
-                    print("   • Items de pago migrados con referencias correctas")
-                    print("   • Usuarios vinculados mediante búsqueda por email")
-                    print(
-                        "   • Revisa el reporte generado para estadísticas detalladas")
-                elif submodule_name == "membership-plans":
-                    print("\n💡 SIGUIENTE PASO RECOMENDADO:")
-                    print("   • Ahora puedes migrar las membresías de usuarios")
-                elif submodule_name == "memberships":
-                    print("\n💡 MIGRACIÓN COMPLETADA:")
-                    print("   • Membresías migradas conservando IDs originales")
-                    print("   • Reconsumptions migrados con referencias correctas")
-                    print("   • Historial migrado manteniendo trazabilidad")
-                    print("   • Usuarios vinculados mediante búsqueda por email")
-                    print("   • Se aplicaron todas las validaciones de entidad")
-                    print("   • Revisa el reporte generado para estadísticas detalladas")
-                elif submodule_name == "user-points":
-                    print("\n💡 MIGRACIÓN COMPLETADA:")
-                    print("   • Puntos de usuarios migrados conservando IDs originales")
-                    print("   • Transacciones migradas con referencias correctas")
-                    print("   • Transaction_payments migrados manteniendo trazabilidad")
-                    print("   • Usuarios vinculados mediante búsqueda por email")
-                    print("   • Pagos vinculados mediante búsqueda por ID")
-                    print("   • Se aplicaron todas las validaciones de entidad")
-                    print("   • Revisa el reporte generado para estadísticas detalladas")
-                elif submodule_name == "weekly-volumes":
-                    print("\n💡 MIGRACIÓN COMPLETADA:")
-                    print("   • Volúmenes semanales migrados conservando IDs originales")
-                    print("   • Historial de volúmenes migrado con referencias correctas")
-                    print("   • Usuarios vinculados mediante búsqueda por email")
-                    print("   • Estados y lados de volumen mapeados correctamente")
-                    print("   • Fechas y volúmenes validados según reglas de negocio")
-                    print("   • Se aplicaron todas las validaciones de entidad")
-                    print("   • Revisa el reporte generado para estadísticas detalladas")
+        except KeyboardInterrupt:
+            console.print("\n👋 ¡Hasta luego!", style="bold yellow")
+        except Exception as e:
+            logger.error(f"Error en aplicación: {str(e)}")
+            self.ui.error(f"Error inesperado: {str(e)}")
+            return False
+        
+        return True
+
+    def _check_basic_env(self) -> bool:
+        if not os.getenv('NEXUS_POSTGRES_URL'):
+            self.ui.error("Falta NEXUS_POSTGRES_URL en las variables de entorno")
+            return False
+        return True
+
+    def _show_main_menu(self):
+        self.ui.show_banner()
+        table = self.ui.show_modules(self.controller.get_modules())
+        console.print(table)
+        console.print()
+
+    def _handle_submodules(self, module_name: str):
+        while True:
+            self.ui.show_banner()
+            
+            submodules = self.controller.get_modules()[module_name]
+            table = self.ui.show_submodules(module_name, submodules)
+            console.print(table)
+            console.print()
+            
+            choice = self.ui.get_choice(
+                "Selecciona un submódulo",
+                len(submodules) + 1
+            )
+            
+            if choice == len(submodules) + 1:
+                break
+            
+            submodule_names = list(submodules.keys())
+            selected_submodule = submodule_names[choice - 1]
+            
+            # Ejecutar migración
+            if self._execute_migration(module_name, selected_submodule):
+                if not self.ui.confirm("¿Realizar otra migración?"):
+                    sys.exit(0)
             else:
-                print(f"\n💥 MIGRACIÓN FALLÓ")
-                print(f"❌ Error en {module_name} -> {submodule_name}")
-                print("📄 Revisa los logs y el reporte de errores generado")
+                self.ui.wait()
 
+    def _execute_migration(self, module_name: str, submodule_name: str) -> bool:
+        try:
+            missing_vars = self.controller.check_env_vars(module_name, submodule_name)
+            if missing_vars:
+                self.ui.error(f"Variables faltantes: {', '.join(missing_vars)}")
+                return False
+
+            if not self.ui.confirm(
+                f"¿Migrar {module_name} -> {submodule_name}?\n"
+                "⚠️ Esto eliminará datos existentes en el destino"
+            ):
+                console.print("❌ Migración cancelada", style="yellow")
+                return False
+
+            console.print(f"\n🚀 Ejecutando: {module_name} -> {submodule_name}", style="bold blue")
+            
+            success = self.controller.execute_migration(module_name, submodule_name)
+            
+            if success:
+                self.ui.success(f"Migración {submodule_name} completada exitosamente")
+            else:
+                self.ui.error(f"Migración {submodule_name} falló. Revisa los logs.")
+            
             return success
 
         except Exception as e:
-            logger.error(f"Error crítico durante la migración: {str(e)}")
-            print(f"\n💥 ERROR CRÍTICO: {str(e)}")
+            logger.error(f"Error en migración: {str(e)}")
+            self.ui.error(f"Error durante migración: {str(e)}")
             return False
 
-    def run(self):
-        """Ejecuta la aplicación principal"""
-        self.display_banner()
-
-        # Validar entorno básico
-        if not self.validate_environment():
-            print("\n❌ No se puede continuar sin las variables de entorno básicas")
-            sys.exit(1)
-
-        while True:
-            self.display_modules()
-
-            # Obtener selección de módulo
-            module_choice = self.get_user_choice(len(self.modules) + 1)
-
-            # Opción de salir
-            if module_choice == len(self.modules) + 1:
-                print("\n👋 ¡Hasta luego!")
-                break
-
-            # Obtener módulo seleccionado
-            module_names = list(self.modules.keys())
-            selected_module = module_names[module_choice - 1]
-            submodules = self.modules[selected_module]
-
-            # Verificar si el módulo tiene submódulos
-            if not submodules:
-                print(
-                    f"\n🚧 {selected_module} está en desarrollo. Intenta más tarde.")
-                input("\nPresiona Enter para continuar...")
-                continue
-
-            # Mostrar submódulos
-            while True:
-                self.display_submodules(selected_module)
-
-                # Obtener selección de submódulo
-                submodule_choice = self.get_user_choice(len(submodules) + 1)
-
-                # Opción de volver
-                if submodule_choice == len(submodules) + 1:
-                    break
-
-                # Obtener submódulo seleccionado
-                submodule_names = list(submodules.keys())
-                selected_submodule = submodule_names[submodule_choice - 1]
-
-                # Confirmar migración
-                if self.confirm_migration(selected_module, selected_submodule):
-                    # Ejecutar migración
-                    success = self.execute_migration(
-                        selected_module, selected_submodule)
-
-                    if success:
-                        # Preguntar si quiere hacer otra migración
-                        while True:
-                            another = input(
-                                "\n¿Quieres realizar otra migración? (s/N): ").strip().lower()
-                            if another in ['s', 'si', 'sí', 'y', 'yes']:
-                                break
-                            elif another in ['n', 'no', ''] or not another:
-                                print("\n👋 ¡Hasta luego!")
-                                sys.exit(0)
-                            else:
-                                print(
-                                    "❌ Por favor responde 's' para sí o 'n' para no")
-                    else:
-                        input("\nPresiona Enter para continuar...")
-                else:
-                    print("❌ Migración cancelada")
-                    input("\nPresiona Enter para continuar...")
-
-
 def main():
-    """Función principal"""
     try:
         app = MigrationApp()
-        app.run()
+        success = app.run()
+        sys.exit(0 if success else 1)
+
     except KeyboardInterrupt:
-        print("\n\n👋 ¡Hasta luego!")
+        console.print("\n👋 ¡Hasta luego!", style="bold yellow")
         sys.exit(0)
     except Exception as e:
-        logger.error(f"Error en la aplicación: {str(e)}")
-        print(f"\n💥 Error inesperado: {str(e)}")
+        logger.error(f"Error en aplicación: {str(e)}")
+        console.print(f"💥 Error: {str(e)}", style="bold red")
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
