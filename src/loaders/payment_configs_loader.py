@@ -170,13 +170,5 @@ class PaymentConfigsLoader:
 
         return validation_results
 
-    def get_load_stats(self) -> Dict[str, Any]:
-        return {
-            'configs_inserted': self.stats['configs_inserted'],
-            'configs_deleted': self.stats['configs_deleted'],
-            'total_errors': len(self.stats['errors']),
-            'errors': self.stats['errors']
-        }
-
     def close_connection(self):
         self.postgres_conn.disconnect()
