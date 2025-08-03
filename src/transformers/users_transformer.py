@@ -45,13 +45,11 @@ class UsersTransformer:
         
         transformed_users = []
         
-        # Generar mapping de IDs
         for user in users_data:
             old_id = user['user_id']
             new_id = str(ObjectId())
             self.user_id_mapping[old_id] = new_id
         
-        # Transformar usuarios
         for user in users_data:
             try:
                 transformed_user = self._transform_single_user(user)
@@ -350,14 +348,12 @@ class UsersTransformer:
             documents = set()
             
             for user in transformed_users:
-                # Validar email único
                 email = user['email']
                 if email in emails:
                     validation_results['errors'].append(f"Email duplicado: {email}")
                     validation_results['valid'] = False
                 emails.add(email)
                 
-                # Validar código de referencia único
                 referral_code = user['referralCode']
                 if referral_code and referral_code in referral_codes:
                     validation_results['errors'].append(f"Código de referencia duplicado: {referral_code}")
@@ -365,7 +361,6 @@ class UsersTransformer:
                 if referral_code:
                     referral_codes.add(referral_code)
                 
-                # Validar documento único
                 personal_info = user['personalInfo']
                 document_key = f"{personal_info['documentType']}-{personal_info['documentNumber']}"
                 if document_key in documents:

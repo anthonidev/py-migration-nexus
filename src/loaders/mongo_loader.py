@@ -224,15 +224,5 @@ class MongoLoader:
         
         return validation_results
     
-    def get_load_stats(self) -> Dict[str, Any]:
-        return {
-            'views_inserted': self.stats['views_inserted'],
-            'roles_inserted': self.stats['roles_inserted'],
-            'views_deleted': self.stats['views_deleted'],
-            'roles_deleted': self.stats['roles_deleted'],
-            'total_errors': len(self.stats['errors']),
-            'errors': self.stats['errors']
-        }
-    
     def close_connection(self):
         self.mongo_conn.disconnect()

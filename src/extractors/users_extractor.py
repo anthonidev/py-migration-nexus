@@ -70,7 +70,6 @@ class UsersExtractor:
             raise
     
     def validate_required_data(self) -> Dict[str, Any]:
-        """Valida que los datos requeridos estén presentes"""
         logger.info("Validando datos requeridos para la migración")
         
         validation_results = {
@@ -80,7 +79,6 @@ class UsersExtractor:
         }
         
         try:
-            # Validar usuarios sin email
             no_email_query = "SELECT COUNT(*) FROM users WHERE email IS NULL OR email = ''"
             no_email_results, _ = self.postgres_conn.execute_query(no_email_query)
             users_without_email = no_email_results[0][0]
@@ -89,7 +87,6 @@ class UsersExtractor:
                 validation_results['errors'].append(f"{users_without_email} usuarios sin email")
                 validation_results['valid'] = False
             
-            # Validar usuarios sin rol
             no_role_query = """
             SELECT COUNT(*) FROM users u 
             LEFT JOIN roles r ON u."roleId" = r.id 
@@ -102,7 +99,6 @@ class UsersExtractor:
                 validation_results['errors'].append(f"{users_without_role} usuarios sin rol asignado")
                 validation_results['valid'] = False
             
-            # Validar códigos de referencia duplicados
             duplicate_referral_query = """
             SELECT "referralCode", COUNT(*) as count 
             FROM users 
@@ -126,5 +122,4 @@ class UsersExtractor:
             return validation_results
     
     def close_connection(self):
-        """Cierra la conexión a PostgreSQL"""
         self.postgres_conn.disconnect()

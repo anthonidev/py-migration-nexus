@@ -153,13 +153,5 @@ class UsersLoader:
         
         return validation_results
     
-    def get_load_stats(self) -> Dict[str, Any]:
-        return {
-            'users_inserted': self.stats['users_inserted'],
-            'users_deleted': self.stats['users_deleted'],
-            'total_errors': len(self.stats['errors']),
-            'errors': self.stats['errors']
-        }
-    
     def close_connection(self):
         self.mongo_conn.disconnect()

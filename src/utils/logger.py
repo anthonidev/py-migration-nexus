@@ -62,7 +62,7 @@ def info(message: str):
     logger = get_logger()
     logger.info(message)
 
-def error(message: str):
+def failure(message: str):
     logger = get_logger()
     logger.error(message)
 
@@ -76,7 +76,7 @@ def debug(message: str):
 
 def success(message: str):
     logger = get_logger()
-    logger.info(f"[bold green]✅ {message}[/bold green]")
+    logger.info(f"\n[bold green]✅ {message}[/bold green]")
 
 def failure(message: str):
     logger = get_logger()
@@ -85,3 +85,11 @@ def failure(message: str):
 def progress(message: str):
     logger = get_logger()
     logger.info(f"[bold blue]🚀 {message}[/bold blue]")
+    
+def title(message: str):
+    logger = get_logger()
+    logger.info(f"\n[bold magenta]{message}[/bold magenta]\n")
+    
+def subtitle(message: str):
+    logger = get_logger()
+    logger.info(f"\n[bold cyan]{message}[/bold cyan]")
