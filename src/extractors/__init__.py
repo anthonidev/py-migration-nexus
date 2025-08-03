@@ -8,8 +8,9 @@ from .payments_extractor import PaymentsExtractor
 from .membership_plans_extractor import MembershipPlansExtractor
 from .memberships_extractor import MembershipsExtractor
 from .user_points_extractor import UserPointsExtractor
+from .weekly_volumes_extractor import WeeklyVolumesExtractor
 
 __all__ = ['RolesViewsExtractor', 'UsersExtractor',
            'PaymentConfigsExtractor', 'PaymentsExtractor', 
            'MembershipPlansExtractor', 'MembershipsExtractor',
-           'UserPointsExtractor']
+           'UserPointsExtractor', 'WeeklyVolumesExtractor']

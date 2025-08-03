@@ -1,5 +1,4 @@
-
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from src.connections.mongo_connection import MongoConnection
 from src.utils.logger import get_logger
 
@@ -56,6 +55,63 @@ class UserService:
         except Exception as e:
             logger.error(f"Error buscando usuario por email {email}: {str(e)}")
             return None
+
+    def get_users_batch(self, emails: List[str]) -> Dict[str, Dict[str, Any]]:
+        if not emails:
+            logger.warning("Lista de emails vacía")
+            return {}
+        
+        try:
+            self._ensure_connection()
+            
+            normalized_emails = list(set(email.lower().strip() for email in emails if email and email.strip()))
+            
+            if not normalized_emails:
+                logger.warning("No hay emails válidos después de la normalización")
+                return {}
+            
+            
+            cursor = self.users_collection.find(
+                {'email': {'$in': normalized_emails}},
+                {
+                    '_id': 1,
+                    'email': 1,
+                    'personalInfo.firstName': 1,
+                    'personalInfo.lastName': 1
+                }
+            )
+            
+            users_dict = {}
+            
+            for user in cursor:
+                print(f"Procesando usuario: {user.get('email', 'N/A')}")
+                
+                personal_info = user.get('personalInfo', {})
+                first_name = personal_info.get('firstName', '')
+                last_name = personal_info.get('lastName', '')
+                full_name = f"{first_name} {last_name}".strip()
+                
+                email = user['email']
+                users_dict[email] = {
+                    'id': str(user['_id']),
+                    'email': email,
+                    'fullName': full_name
+                }
+            
+            found_count = len(users_dict)
+            total_requested = len(normalized_emails)
+            
+            if found_count < total_requested:
+                missing_emails = set(normalized_emails) - set(users_dict.keys())
+                logger.warning(f"No se encontraron {total_requested - found_count} usuarios: {missing_emails}")
+            
+            logger.info(f"Usuarios obtenidos en lote: {found_count}/{total_requested}")
+            logger.warning(f"Usuarios obtenidos: {users_dict}")
+            return users_dict
+            
+        except Exception as e:
+            logger.error(f"Error obteniendo usuarios en lote {emails}: {str(e)}")
+            return {}
 
     def close_connection(self):
         if self.mongo_conn:

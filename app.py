@@ -56,6 +56,10 @@ class MigrationApp:
         def migrate_user_points():
             from src.core.user_points_migration import main
             return main()
+        
+        def migrate_weekly_volumes():
+            from src.core.weekly_volumes_migration import main
+            return main()
 
         return {
             "ms-users": {
@@ -72,6 +76,7 @@ class MigrationApp:
             },
             "ms-points": {
                 "user-points": migrate_user_points,
+                "weekly-volumes": migrate_weekly_volumes,
             },
             # TODO: Agregar otros microservicios
             # "ms-orders": {
@@ -137,6 +142,7 @@ class MigrationApp:
             print("   MS_NEXUS_USER=mongodb://user:pass@host:port/db")
             print("   MS_NEXUS_PAYMENTS=postgresql://user:pass@host:port/db")
             print("   MS_NEXUS_MEMBERSHIP=postgresql://user:pass@host:port/db")
+            print("   MS_NEXUS_POINTS=postgresql://user:pass@host:port/db")
             return False
 
         print("✅ Variables de entorno básicas configuradas correctamente")
@@ -156,6 +162,10 @@ class MigrationApp:
             "ms-membership": {
                 "membership-plans": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_MEMBERSHIP'],
                 "memberships": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_MEMBERSHIP', 'MS_NEXUS_USER']
+            },
+            "ms-points": {
+                "user-points": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_POINTS', 'MS_NEXUS_USER', 'MS_NEXUS_PAYMENTS'],
+                "weekly-volumes": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_POINTS', 'MS_NEXUS_USER']
             }
         }
 
@@ -244,6 +254,26 @@ class MigrationApp:
             print("   • Se migrarán todas las entidades relacionadas (memberships, reconsumptions, history)")
             print("   • Se validarán fechas de inicio/fin y montos de reconsumo")
             print("   • Se aplicarán todas las validaciones @BeforeInsert/@BeforeUpdate")
+        elif submodule_name == "user-points":
+            print("\n📋 REQUISITOS ESPECÍFICOS PARA PUNTOS DE USUARIOS:")
+            print("   • Los usuarios deben estar migrados en ms-users (MongoDB)")
+            print("   • Los pagos deben estar migrados en ms-payments (PostgreSQL)")
+            print("   • Se conservarán los IDs originales de user_points, transactions y transaction_payments")
+            print("   • Se buscarán usuarios por email para obtener IDs y nombres")
+            print("   • Se migrarán todas las entidades relacionadas (user_points, transactions, transaction_payments)")
+            print("   • Se validarán consistencias de puntos ganados vs retirados")
+            print("   • Se aplicarán todas las validaciones @BeforeInsert/@BeforeUpdate")
+        elif submodule_name == "weekly-volumes":
+            print("\n📋 REQUISITOS ESPECÍFICOS PARA VOLÚMENES SEMANALES:")
+            print("   • Los usuarios deben estar migrados en ms-users (MongoDB)")
+            print("   • Se conservarán los IDs originales de weekly_volumes y weekly_volume_history")
+            print("   • Se buscarán usuarios por email para obtener IDs y nombres")
+            print("   • Se migrarán todas las entidades relacionadas (weekly_volumes, weekly_volume_history)")
+            print("   • Se validarán fechas de semana (inicio < fin)")
+            print("   • Se validarán volúmenes no negativos")
+            print("   • Se mapearán estados (PENDING, PROCESSED, CANCELLED)")
+            print("   • Se mapearán lados de volumen (LEFT, RIGHT)")
+            print("   • Se aplicarán todas las validaciones @BeforeInsert/@BeforeUpdate")
 
         while True:
             confirm = input(
@@ -304,6 +334,24 @@ class MigrationApp:
                     print("   • Reconsumptions migrados con referencias correctas")
                     print("   • Historial migrado manteniendo trazabilidad")
                     print("   • Usuarios vinculados mediante búsqueda por email")
+                    print("   • Se aplicaron todas las validaciones de entidad")
+                    print("   • Revisa el reporte generado para estadísticas detalladas")
+                elif submodule_name == "user-points":
+                    print("\n💡 MIGRACIÓN COMPLETADA:")
+                    print("   • Puntos de usuarios migrados conservando IDs originales")
+                    print("   • Transacciones migradas con referencias correctas")
+                    print("   • Transaction_payments migrados manteniendo trazabilidad")
+                    print("   • Usuarios vinculados mediante búsqueda por email")
+                    print("   • Pagos vinculados mediante búsqueda por ID")
+                    print("   • Se aplicaron todas las validaciones de entidad")
+                    print("   • Revisa el reporte generado para estadísticas detalladas")
+                elif submodule_name == "weekly-volumes":
+                    print("\n💡 MIGRACIÓN COMPLETADA:")
+                    print("   • Volúmenes semanales migrados conservando IDs originales")
+                    print("   • Historial de volúmenes migrado con referencias correctas")
+                    print("   • Usuarios vinculados mediante búsqueda por email")
+                    print("   • Estados y lados de volumen mapeados correctamente")
+                    print("   • Fechas y volúmenes validados según reglas de negocio")
                     print("   • Se aplicaron todas las validaciones de entidad")
                     print("   • Revisa el reporte generado para estadísticas detalladas")
             else:
