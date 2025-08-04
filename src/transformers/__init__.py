@@ -10,9 +10,10 @@ from .memberships_transformer import MembershipsTransformer
 from .user_points_transformer import UserPointsTransformer
 from .weekly_volumes_transformer import WeeklyVolumesTransformer
 from .products_transformer import ProductsTransformer
+from .orders_transformer import OrdersTransformer
 
 __all__ = ['RolesViewsTransformer', 'UsersTransformer',
            'PaymentConfigsTransformer', 'PaymentsTransformer',
            'MembershipPlansTransformer', 'MembershipsTransformer',
            'UserPointsTransformer', 'WeeklyVolumesTransformer',
-           'ProductsTransformer']
+           'ProductsTransformer', 'OrdersTransformer']

@@ -50,8 +50,13 @@ class MigrationController:
         def migrate_weekly_volumes():
             from src.core.weekly_volumes_migration import main
             return main()
+        
         def migrate_products():
             from src.core.products_migration import main
+            return main()
+        
+        def migrate_orders():
+            from src.core.orders_migration import main
             return main()
 
 
@@ -72,8 +77,9 @@ class MigrationController:
                 "user-points": migrate_user_points,
                 "weekly-volumes": migrate_weekly_volumes,
             },
-            "ms-products": {
+            "ms-orders": {
                 "products": migrate_products,
+                "orders": migrate_orders,
             }
         }
 
@@ -97,7 +103,8 @@ class MigrationController:
                 "weekly-volumes": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_POINTS', 'MS_NEXUS_USER']
             },
              "ms-orders": {
-                "products": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_ORDERS', 'MS_NEXUS_USER']
+                "products": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_ORDERS', 'MS_NEXUS_USER'],
+                "orders": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_ORDERS', 'MS_NEXUS_USER']
             }
         }
 

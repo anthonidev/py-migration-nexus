@@ -106,7 +106,6 @@ class UserService:
                 logger.warning(f"No se encontraron {total_requested - found_count} usuarios: {missing_emails}")
             
             logger.info(f"Usuarios obtenidos en lote: {found_count}/{total_requested}")
-            logger.warning(f"Usuarios obtenidos: {users_dict}")
             return users_dict
             
         except Exception as e:
