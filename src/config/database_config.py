@@ -48,3 +48,11 @@ class DatabaseConfig:
             raise ValueError(
                 "Variable de entorno MS_NEXUS_POINTS no encontrada")
         return url
+    
+    @staticmethod
+    def get_orders_postgres_url() -> str:
+        url = os.getenv('MS_NEXUS_ORDERS')
+        if not url:
+            raise ValueError(
+                "Variable de entorno MS_NEXUS_ORDERS no encontrada")
+        return url

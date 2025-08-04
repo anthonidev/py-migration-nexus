@@ -50,6 +50,10 @@ class MigrationController:
         def migrate_weekly_volumes():
             from src.core.weekly_volumes_migration import main
             return main()
+        def migrate_products():
+            from src.core.products_migration import main
+            return main()
+
 
         return {
             "ms-users": {
@@ -68,6 +72,9 @@ class MigrationController:
                 "user-points": migrate_user_points,
                 "weekly-volumes": migrate_weekly_volumes,
             },
+            "ms-products": {
+                "products": migrate_products,
+            }
         }
 
     def _init_env_requirements(self) -> Dict[str, Dict[str, List[str]]]:
@@ -88,6 +95,9 @@ class MigrationController:
             "ms-points": {
                 "user-points": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_POINTS', 'MS_NEXUS_USER', 'MS_NEXUS_PAYMENTS'],
                 "weekly-volumes": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_POINTS', 'MS_NEXUS_USER']
+            },
+             "ms-orders": {
+                "products": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_ORDERS', 'MS_NEXUS_USER']
             }
         }
 
