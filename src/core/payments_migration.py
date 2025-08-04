@@ -1,144 +1,149 @@
-from src.utils.logger import get_logger
 from src.loaders.payments_loader import PaymentsLoader
 from src.transformers.payments_transformer import PaymentsTransformer
 from src.extractors.payments_extractor import PaymentsExtractor
+from src.utils.migration_reports import (
+    MigrationReportBuilder,
+    extract_validation_issues,
+    process_transformation_summary
+)
 import os
 import sys
-from datetime import datetime
+from src.utils.logger import title, subtitle, success, failure,  info
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))
 
-logger = get_logger(__name__)
 
 def main():
+    report_builder = MigrationReportBuilder("payments")
+    
     try:
-        logger.info("🚀 === INICIANDO MIGRACIÓN DE PAGOS ===")
-        start_time = datetime.now()
+        title("🚀 === INICIANDO MIGRACIÓN DE PAGOS ===")
 
-        # 1. VALIDACIÓN PREVIA
-        logger.info("🔍 PASO 1: Validando datos de origen")
+        subtitle("🔍 PASO 1: Validando datos de origen")
         extractor = PaymentsExtractor()
 
         validation_result = extractor.validate_source_data()
         if not validation_result['valid']:
-            logger.error("❌ Validación de datos de origen fallida")
+            failure("❌ Validación de datos de origen fallida")
             for error in validation_result['errors']:
-                logger.error(f"   - {error}")
+                failure(f"   - {error}")
+            
+            errors, warnings = extract_validation_issues(validation_result)
+            report_builder.add_validation_errors(errors).add_validation_warnings(warnings)
+            report_builder.mark_failure()
+            report_builder.build().save_to_file()
             return False
 
-        # 2. EXTRACCIÓN
-        logger.info("📤 PASO 2: Extrayendo pagos de PostgreSQL (monolito)")
+        subtitle("📤 PASO 2: Extrayendo pagos de PostgreSQL (monolito)")
         payments_data = extractor.extract_payments_data()
-        logger.info(f"✅ Extraídos {len(payments_data)} pagos")
+        info(f"✅ Extraídos {len(payments_data)} pagos")
 
-        # 3. TRANSFORMACIÓN
-        logger.info("🔄 PASO 3: Transformando datos para ms-payments PostgreSQL")
+        report_builder.extraction_completed("payments", len(payments_data))
+
+        subtitle("🔄 PASO 3: Transformando datos para ms-payments PostgreSQL")
         transformer = PaymentsTransformer()
 
         transformed_payments, transformed_payment_items = transformer.transform_payments_data(payments_data)
 
-        # Validar transformación
+        transform_summary = transformer.get_transformation_summary()
+        total_errors, errors, warnings = process_transformation_summary(transform_summary)
+        
+        report_builder.transformation_completed("payments", transform_summary['payments_transformed'], total_errors)
+        report_builder.transformation_completed("payment_items", transform_summary['payment_items_transformed'], total_errors)
+        report_builder.add_validation_errors(errors).add_validation_warnings(warnings)
+
         transformation_validation = transformer.validate_transformation(
             transformed_payments, transformed_payment_items)
         if not transformation_validation['valid']:
-            logger.error("❌ Validación de transformación fallida")
+            failure("❌ Validación de transformación fallida")
             for error in transformation_validation['errors']:
-                logger.error(f"   - {error}")
+                failure(f"   - {error}")
+            
+            val_errors, val_warnings = extract_validation_issues(transformation_validation)
+            report_builder.add_validation_errors(val_errors).add_validation_warnings(val_warnings)
+            report_builder.mark_failure()
+            report_builder.build().save_to_file()
             return False
 
-        transform_summary = transformer.get_transformation_summary()
-        logger.info(f"✅ Transformación completada: {transform_summary['payments_transformed']} pagos, {transform_summary['payment_items_transformed']} items")
+        info(f"✅ Transformación completada: {transform_summary['payments_transformed']} pagos, {transform_summary['payment_items_transformed']} items")
 
-        # 4. CARGA
-        logger.info("📥 PASO 4: Cargando datos en PostgreSQL (ms-payments)")
+        subtitle("📥 PASO 4: Cargando datos en PostgreSQL (ms-payments)")
         loader = PaymentsLoader()
 
-        # Cargar pagos
         payments_result = loader.load_payments(transformed_payments, clear_existing=True)
 
         if not payments_result['success']:
-            logger.error("❌ Error en la carga de pagos")
+            failure("❌ Error en la carga de pagos")
             if 'error' in payments_result:
-                logger.error(f"Error: {payments_result['error']}")
+                failure(f"Error: {payments_result['error']}")
+            
+            report_builder.loading_completed("payments", 0, 0, 1)
+            report_builder.add_validation_errors([payments_result.get('error', 'Error en carga de pagos')])
+            report_builder.mark_failure()
+            report_builder.build().save_to_file()
             return False
 
-        logger.info(f"✅ Pagos cargados: {payments_result['inserted_count']} insertados")
+        payments_inserted = payments_result.get('inserted_count', 0)
+        payments_deleted = payments_result.get('deleted_count', 0)
+        report_builder.loading_completed("payments", payments_inserted, payments_deleted)
 
-        # Cargar items de pago
+        info(f"✅ Pagos cargados: {payments_inserted} insertados")
+
         items_result = loader.load_payment_items(transformed_payment_items)
 
         if not items_result['success']:
-            logger.error("❌ Error en la carga de items de pago")
+            failure("❌ Error en la carga de items de pago")
             if 'error' in items_result:
-                logger.error(f"Error: {items_result['error']}")
+                failure(f"Error: {items_result['error']}")
+            
+            report_builder.loading_completed("payment_items", 0, 0, 1)
+            report_builder.add_validation_errors([items_result.get('error', 'Error en carga de items')])
+            report_builder.mark_failure()
+            report_builder.build().save_to_file()
             return False
 
-        logger.info(f"✅ Items de pago cargados: {items_result['inserted_count']} insertados")
+        items_inserted = items_result.get('inserted_count', 0)
+        report_builder.loading_completed("payment_items", items_inserted, 0)
 
-        # 5. VALIDACIÓN POST-CARGA
-        logger.info("✅ PASO 5: Validando integridad de datos")
+        info(f"✅ Items de pago cargados: {items_inserted} insertados")
+
+        subtitle("✅ PASO 5: Validando integridad de datos")
         integrity_validation = loader.validate_data_integrity()
 
         if not integrity_validation['valid']:
-            logger.error("❌ Validación de integridad fallida")
+            failure("❌ Validación de integridad fallida")
             for error in integrity_validation['errors']:
-                logger.error(f"   - {error}")
+                failure(f"   - {error}")
+            
+            int_errors, int_warnings = extract_validation_issues(integrity_validation)
+            report_builder.add_validation_errors(int_errors).add_validation_warnings(int_warnings)
+            report_builder.mark_failure()
+            report_builder.build().save_to_file()
             return False
 
-        # 6. RESULTADOS
-        end_time = datetime.now()
-        duration = end_time - start_time
+        if integrity_validation.get('warnings'):
+            report_builder.add_validation_warnings(integrity_validation['warnings'])
 
-        logger.info("🎉 === MIGRACIÓN DE PAGOS COMPLETADA EXITOSAMENTE ===")
-        logger.info(f"⏱️  Duración total: {duration}")
-        logger.info(f"💳 Pagos migrados: {integrity_validation['stats']['total_payments']}")
-        logger.info(f"📋 Items migrados: {integrity_validation['stats']['total_payment_items']}")
+        success("🎉 === MIGRACIÓN DE PAGOS COMPLETADA EXITOSAMENTE ===")
+        info(f"💳 Pagos migrados: {integrity_validation['stats']['total_payments']}")
+        info(f"📋 Items migrados: {integrity_validation['stats']['total_payment_items']}")
 
-        # Guardar reporte simplificado
-        save_migration_report({
-            'summary': {
-                'success': True,
-                'duration': str(duration),
-                'payments_migrated': integrity_validation['stats']['total_payments'],
-                'payment_items_migrated': integrity_validation['stats']['total_payment_items']
-            },
-            'extraction': {
-                'total_extracted': len(payments_data)
-            },
-            'transformation': {
-                'payments_transformed': transform_summary['payments_transformed'],
-                'payment_items_transformed': transform_summary['payment_items_transformed'],
-                'total_errors': transform_summary['total_errors'],
-                'total_warnings': transform_summary['total_warnings'],
-                'errors': transform_summary['errors'],
-                'warnings': transform_summary['warnings'],
-                'validation': transformation_validation
-            },
-            'loading': {
-                'payments_result': {
-                    'success': payments_result['success'],
-                    'inserted_count': payments_result['inserted_count'],
-                    'deleted_count': payments_result['deleted_count']
-                },
-                'items_result': {
-                    'success': items_result['success'],
-                    'inserted_count': items_result['inserted_count']
-                },
-                'load_stats': loader.get_load_stats(),
-                'integrity_validation': integrity_validation
-            }
-        })
+        report_builder.mark_success()
+        final_report = report_builder.build()
+        final_report.save_to_file()
 
         return True
 
     except Exception as e:
-        logger.error(f"💥 Error crítico durante la migración de pagos: {str(e)}")
-        logger.exception("Detalles del error:")
+        failure(f"💥 Error crítico durante la migración de pagos: {str(e)}")
+        report_builder.add_validation_errors([f"Error crítico: {str(e)}"])
+        report_builder.mark_failure()
+        report_builder.build().save_to_file()
+        
         return False
 
     finally:
-        # Cerrar conexiones
         try:
             if 'extractor' in locals():
                 extractor.close_connection()
@@ -147,42 +152,13 @@ def main():
             if 'loader' in locals():
                 loader.close_connection()
         except Exception as e:
-            logger.error(f"Error cerrando conexiones: {str(e)}")
+            failure(f"Error cerrando conexiones: {str(e)}")
 
-def save_migration_report(report_data, filename_prefix="payments_migration_report"):
-    """Guarda el reporte de migración simplificado en un archivo"""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_filename = f"{filename_prefix}_{timestamp}.json"
-
-    import json
-    with open(report_filename, 'w', encoding='utf-8') as f:
-        json.dump(report_data, f, indent=2, default=str)
-
-    logger.info(f"📄 Reporte de migración guardado en: {report_filename}")
-
-def validate_environment():
-    """Valida que las variables de entorno estén configuradas"""
-    required_vars = ['NEXUS_POSTGRES_URL', 'MS_NEXUS_PAYMENTS', 'MS_NEXUS_USER']
-    missing_vars = []
-
-    for var in required_vars:
-        if not os.getenv(var):
-            missing_vars.append(var)
-
-    if missing_vars:
-        logger.error("❌ Variables de entorno faltantes:")
-        for var in missing_vars:
-            logger.error(f"   - {var}")
-        return False
-
-    return True
 
 def check_dependencies():
-    """Verifica que las dependencias estén disponibles"""
-    logger.info("🔍 Verificando dependencias...")
+    info("🔍 Verificando dependencias...")
 
     try:
-        # Verificar que existan configuraciones de pago
         from src.connections.payments_postgres_connection import PaymentsPostgresConnection
 
         payments_conn = PaymentsPostgresConnection()
@@ -192,58 +168,51 @@ def check_dependencies():
         configs_count, _ = payments_conn.execute_query(check_configs_query)
 
         if configs_count[0][0] == 0:
-            logger.error("❌ No hay configuraciones de pago en ms-payments")
-            logger.error("💡 Ejecuta primero la migración de configuraciones de pago")
+            failure("❌ No hay configuraciones de pago en ms-payments")
+            failure("💡 Ejecuta primero la migración de configuraciones de pago")
             return False
 
-        logger.info(f"✅ Encontradas {configs_count[0][0]} configuraciones de pago en ms-payments")
+        info(f"✅ Encontradas {configs_count[0][0]} configuraciones de pago en ms-payments")
         payments_conn.disconnect()
 
-        # Verificar que existan usuarios en MongoDB
         from src.shared.user_service import UserService
 
         user_service = UserService()
-        # Hacer una búsqueda de prueba
         test_result = user_service.get_user_by_email("test@test.com")
         user_service.close_connection()
 
-        logger.info("✅ Servicio de usuarios disponible")
+        info("✅ Servicio de usuarios disponible")
         return True
 
     except Exception as e:
-        logger.error(f"❌ Error verificando dependencias: {str(e)}")
+        failure(f"❌ Error verificando dependencias: {str(e)}")
         return False
 
 def test_connections():
-    """Prueba las conexiones a las bases de datos"""
-    logger.info("🔍 Probando conexiones a bases de datos...")
 
     try:
-        # Probar conexión al monolito
         from src.connections.postgres_connection import PostgresConnection
         monolito_conn = PostgresConnection()
         monolito_conn.connect()
-        logger.info("✅ Conexión al monolito (PostgreSQL) exitosa")
+        info("✅ Conexión al monolito (PostgreSQL) exitosa")
         monolito_conn.disconnect()
 
-        # Probar conexión a ms-payments
         from src.connections.payments_postgres_connection import PaymentsPostgresConnection
         payments_conn = PaymentsPostgresConnection()
         payments_conn.connect()
-        logger.info("✅ Conexión a ms-payments (PostgreSQL) exitosa")
+        info("✅ Conexión a ms-payments (PostgreSQL) exitosa")
         payments_conn.disconnect()
 
-        # Probar conexión a ms-users (MongoDB)
         from src.connections.mongo_connection import MongoConnection
         mongo_conn = MongoConnection()
         mongo_conn.connect()
-        logger.info("✅ Conexión a ms-users (MongoDB) exitosa")
+        info("✅ Conexión a ms-users (MongoDB) exitosa")
         mongo_conn.disconnect()
 
         return True
 
     except Exception as e:
-        logger.error(f"❌ Error en conexiones: {str(e)}")
+        failure(f"❌ Error en conexiones: {str(e)}")
         return False
 
 if __name__ == "__main__":
@@ -252,9 +221,6 @@ if __name__ == "__main__":
         load_dotenv()
     except ImportError:
         pass
-
-    if not validate_environment():
-        sys.exit(1)
 
     if not test_connections():
         sys.exit(1)

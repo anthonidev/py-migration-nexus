@@ -177,13 +177,5 @@ class MembershipPlansLoader:
 
         return validation_results
 
-    def get_load_stats(self) -> Dict[str, Any]:
-        return {
-            'plans_inserted': self.stats['plans_inserted'],
-            'plans_deleted': self.stats['plans_deleted'],
-            'total_errors': len(self.stats['errors']),
-            'errors': self.stats['errors']
-        }
-
     def close_connection(self):
         self.postgres_conn.disconnect()
