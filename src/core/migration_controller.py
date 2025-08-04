@@ -104,12 +104,10 @@ class MigrationController:
         return sorted(list(all_vars))
 
     def check_env_vars(self, module_name: str, submodule_name: str) -> List[str]:
-        """Verifica variables de entorno y retorna las faltantes"""
         required = self.env_requirements.get(module_name, {}).get(submodule_name, [])
         return [var for var in required if not os.getenv(var)]
 
     def execute_migration(self, module_name: str, submodule_name: str) -> bool:
-        """Ejecuta una migración"""
         try:
             logger.info(f"🚀 Iniciando: {module_name} -> {submodule_name}")
             

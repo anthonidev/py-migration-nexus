@@ -8,15 +8,6 @@ class MembershipsLoader:
 
     def __init__(self):
         self.postgres_conn = MembershipPostgresConnection()
-        self.stats = {
-            'memberships_inserted': 0,
-            'reconsumptions_inserted': 0,
-            'history_inserted': 0,
-            'memberships_deleted': 0,
-            'reconsumptions_deleted': 0,
-            'history_deleted': 0,
-            'errors': []
-        }
 
     def _check_tables_exist(self):
         """Verifica que las tablas necesarias existan"""
@@ -53,10 +44,6 @@ class MembershipsLoader:
             self.postgres_conn.execute_query("SELECT setval('membership_reconsumptions_id_seq', COALESCE((SELECT MAX(id) FROM membership_reconsumptions), 0) + 1, false);")
             self.postgres_conn.execute_query("SELECT setval('membership_history_id_seq', COALESCE((SELECT MAX(id) FROM membership_history), 0) + 1, false);")
 
-            self.stats['memberships_deleted'] = memberships_deleted
-            self.stats['reconsumptions_deleted'] = reconsumptions_deleted
-            self.stats['history_deleted'] = history_deleted
-
             logger.info(f"Eliminados {memberships_deleted} membresías, {reconsumptions_deleted} reconsumptions, {history_deleted} history")
 
             return {
@@ -68,7 +55,6 @@ class MembershipsLoader:
         except Exception as e:
             error_msg = f"Error eliminando datos existentes: {str(e)}"
             logger.error(error_msg)
-            self.stats['errors'].append(error_msg)
             raise
 
     def load_memberships(self, memberships_data: List[Dict[str, Any]], clear_existing: bool = False) -> Dict[str, Any]:
@@ -78,35 +64,35 @@ class MembershipsLoader:
         try:
             self._check_tables_exist()
             
+            deleted_count = 0
             if clear_existing:
-                self.clear_existing_data()
+                clear_result = self.clear_existing_data()
+                deleted_count = clear_result['memberships_deleted']
 
             if not memberships_data:
                 logger.warning("No hay membresías para insertar")
                 return {
                     'success': True,
                     'inserted_count': 0,
-                    'deleted_count': self.stats['memberships_deleted']
+                    'deleted_count': deleted_count
                 }
 
             inserted_count = self._insert_memberships_with_original_ids(memberships_data)
-            self.stats['memberships_inserted'] = inserted_count
             logger.info(f"Insertadas {inserted_count} membresías exitosamente")
 
             return {
                 'success': True,
                 'inserted_count': inserted_count,
-                'deleted_count': self.stats['memberships_deleted']
+                'deleted_count': deleted_count
             }
 
         except Exception as e:
             error_msg = f"Error cargando membresías: {str(e)}"
             logger.error(error_msg)
-            self.stats['errors'].append(error_msg)
             return {
                 'success': False,
                 'inserted_count': 0,
-                'deleted_count': self.stats['memberships_deleted'],
+                'deleted_count': deleted_count if 'deleted_count' in locals() else 0,
                 'error': str(e)
             }
 
@@ -120,7 +106,6 @@ class MembershipsLoader:
                 return {'success': True, 'inserted_count': 0}
 
             inserted_count = self._insert_reconsumptions_with_original_ids(reconsumptions_data)
-            self.stats['reconsumptions_inserted'] = inserted_count
             logger.info(f"Insertados {inserted_count} reconsumptions exitosamente")
 
             return {'success': True, 'inserted_count': inserted_count}
@@ -128,7 +113,6 @@ class MembershipsLoader:
         except Exception as e:
             error_msg = f"Error cargando reconsumptions: {str(e)}"
             logger.error(error_msg)
-            self.stats['errors'].append(error_msg)
             return {'success': False, 'inserted_count': 0, 'error': str(e)}
 
     def load_history(self, history_data: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -141,7 +125,6 @@ class MembershipsLoader:
                 return {'success': True, 'inserted_count': 0}
 
             inserted_count = self._insert_history_with_original_ids(history_data)
-            self.stats['history_inserted'] = inserted_count
             logger.info(f"Insertados {inserted_count} registros de historial exitosamente")
 
             return {'success': True, 'inserted_count': inserted_count}
@@ -149,7 +132,6 @@ class MembershipsLoader:
         except Exception as e:
             error_msg = f"Error cargando historial: {str(e)}"
             logger.error(error_msg)
-            self.stats['errors'].append(error_msg)
             return {'success': False, 'inserted_count': 0, 'error': str(e)}
 
     def _insert_memberships_with_original_ids(self, memberships_data: List[Dict[str, Any]]) -> int:
@@ -389,19 +371,6 @@ class MembershipsLoader:
             validation_results['valid'] = False
 
         return validation_results
-
-    def get_load_stats(self) -> Dict[str, Any]:
-        """Retorna estadísticas de la carga"""
-        return {
-            'memberships_inserted': self.stats['memberships_inserted'],
-            'reconsumptions_inserted': self.stats['reconsumptions_inserted'],
-            'history_inserted': self.stats['history_inserted'],
-            'memberships_deleted': self.stats['memberships_deleted'],
-            'reconsumptions_deleted': self.stats['reconsumptions_deleted'],
-            'history_deleted': self.stats['history_deleted'],
-            'total_errors': len(self.stats['errors']),
-            'errors': self.stats['errors']
-        }
 
     def close_connection(self):
         """Cierra la conexión a la base de datos"""

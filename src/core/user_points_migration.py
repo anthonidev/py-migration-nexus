@@ -1,6 +1,5 @@
 import os
 import sys
-from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))
@@ -8,156 +7,164 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(
 from src.extractors.user_points_extractor import UserPointsExtractor
 from src.transformers.user_points_transformer import UserPointsTransformer
 from src.loaders.user_points_loader import UserPointsLoader
-from src.utils.logger import get_logger
+from src.utils.logger import title, subtitle, success, failure, info
+from src.utils.migration_reports import (
+    MigrationReportBuilder,
+    extract_validation_issues,
+    process_transformation_summary
+)
 
-logger = get_logger(__name__)
 
 def main():
+    report_builder = MigrationReportBuilder("user_points")
+    
     try:
-        logger.info("🚀 === INICIANDO MIGRACIÓN DE PUNTOS DE USUARIOS ===")
-        start_time = datetime.now()
+        title("🚀 === INICIANDO MIGRACIÓN DE PUNTOS DE USUARIOS ===")
 
-        # 1. VALIDACIÓN PREVIA
-        logger.info("🔍 PASO 1: Validando datos de origen")
+        subtitle("🔍 PASO 1: Validando datos de origen")
         extractor = UserPointsExtractor()
 
         validation_result = extractor.validate_source_data()
         if not validation_result['valid']:
-            logger.error("❌ Validación de datos de origen fallida")
+            failure("❌ Validación de datos de origen fallida")
             for error in validation_result['errors']:
-                logger.error(f"   - {error}")
+                failure(f"   - {error}")
+            
+            errors, warnings = extract_validation_issues(validation_result)
+            report_builder.add_validation_errors(errors).add_validation_warnings(warnings)
+            report_builder.mark_failure()
+            report_builder.build().save_to_file()
             return False
 
-        # 2. EXTRACCIÓN
-        logger.info("📤 PASO 2: Extrayendo puntos de usuarios de PostgreSQL (monolito)")
+        subtitle("📤 PASO 2: Extrayendo puntos de usuarios de PostgreSQL (monolito)")
         user_points_data = extractor.extract_user_points_data()
-        logger.info(f"✅ Extraídos {len(user_points_data)} registros de puntos de usuarios")
+        info(f"✅ Extraídos {len(user_points_data)} registros de puntos de usuarios")
 
-        # 3. TRANSFORMACIÓN
-        logger.info("🔄 PASO 3: Transformando datos para ms-points PostgreSQL")
+        report_builder.extraction_completed("user_points", len(user_points_data))
+
+        subtitle("🔄 PASO 3: Transformando datos para ms-points PostgreSQL")
         transformer = UserPointsTransformer()
 
         transformed_user_points, transformed_transactions, transformed_transaction_payments = transformer.transform_user_points_data(user_points_data)
 
-        # Validar transformación
+        transform_summary = transformer.get_transformation_summary()
+        total_errors, errors, warnings = process_transformation_summary(transform_summary)
+        
+        report_builder.transformation_completed("user_points", transform_summary['user_points_transformed'], total_errors)
+        report_builder.transformation_completed("transactions", transform_summary['transactions_transformed'], total_errors)
+        report_builder.transformation_completed("transaction_payments", transform_summary['transaction_payments_transformed'], total_errors)
+        report_builder.add_validation_errors(errors).add_validation_warnings(warnings)
+
         transformation_validation = transformer.validate_transformation(
             transformed_user_points, transformed_transactions, transformed_transaction_payments)
         if not transformation_validation['valid']:
-            logger.error("❌ Validación de transformación fallida")
+            failure("❌ Validación de transformación fallida")
             for error in transformation_validation['errors']:
-                logger.error(f"   - {error}")
+                failure(f"   - {error}")
+            
+            val_errors, val_warnings = extract_validation_issues(transformation_validation)
+            report_builder.add_validation_errors(val_errors).add_validation_warnings(val_warnings)
+            report_builder.mark_failure()
+            report_builder.build().save_to_file()
             return False
 
-        transform_summary = transformer.get_transformation_summary()
-        logger.info(f"✅ Transformación completada: {transform_summary['user_points_transformed']} user_points, {transform_summary['transactions_transformed']} transactions, {transform_summary['transaction_payments_transformed']} transaction_payments")
+        info(f"✅ Transformación completada: {transform_summary['user_points_transformed']} user_points, {transform_summary['transactions_transformed']} transactions, {transform_summary['transaction_payments_transformed']} transaction_payments")
 
-        # 4. CARGA
-        logger.info("📥 PASO 4: Cargando datos en PostgreSQL (ms-points)")
+        subtitle("📥 PASO 4: Cargando datos en PostgreSQL (ms-points)")
         loader = UserPointsLoader()
 
-        # Cargar user_points
         user_points_result = loader.load_user_points(transformed_user_points, clear_existing=True)
 
         if not user_points_result['success']:
-            logger.error("❌ Error en la carga de user_points")
+            failure("❌ Error en la carga de user_points")
             if 'error' in user_points_result:
-                logger.error(f"Error: {user_points_result['error']}")
+                failure(f"Error: {user_points_result['error']}")
+            
+            report_builder.loading_completed("user_points", 0, 0, 1)
+            report_builder.add_validation_errors([user_points_result.get('error', 'Error en carga de user_points')])
+            report_builder.mark_failure()
+            report_builder.build().save_to_file()
             return False
 
-        logger.info(f"✅ User_points cargados: {user_points_result['inserted_count']} insertados")
+        user_points_inserted = user_points_result.get('inserted_count', 0)
+        user_points_deleted = user_points_result.get('deleted_count', 0)
+        report_builder.loading_completed("user_points", user_points_inserted, user_points_deleted)
 
-        # Cargar transactions
+        info(f"✅ User_points cargados: {user_points_inserted} insertados")
+
         transactions_result = loader.load_transactions(transformed_transactions)
 
         if not transactions_result['success']:
-            logger.error("❌ Error en la carga de transactions")
+            failure("❌ Error en la carga de transactions")
             if 'error' in transactions_result:
-                logger.error(f"Error: {transactions_result['error']}")
+                failure(f"Error: {transactions_result['error']}")
+            
+            report_builder.loading_completed("transactions", 0, 0, 1)
+            report_builder.add_validation_errors([transactions_result.get('error', 'Error en carga de transactions')])
+            report_builder.mark_failure()
+            report_builder.build().save_to_file()
             return False
 
-        logger.info(f"✅ Transactions cargadas: {transactions_result['inserted_count']} insertadas")
+        transactions_inserted = transactions_result.get('inserted_count', 0)
+        report_builder.loading_completed("transactions", transactions_inserted, 0)
 
-        # Cargar transaction_payments
+        info(f"✅ Transactions cargadas: {transactions_inserted} insertadas")
+
         transaction_payments_result = loader.load_transaction_payments(transformed_transaction_payments)
 
         if not transaction_payments_result['success']:
-            logger.error("❌ Error en la carga de transaction_payments")
+            failure("❌ Error en la carga de transaction_payments")
             if 'error' in transaction_payments_result:
-                logger.error(f"Error: {transaction_payments_result['error']}")
+                failure(f"Error: {transaction_payments_result['error']}")
+            
+            report_builder.loading_completed("transaction_payments", 0, 0, 1)
+            report_builder.add_validation_errors([transaction_payments_result.get('error', 'Error en carga de transaction_payments')])
+            report_builder.mark_failure()
+            report_builder.build().save_to_file()
             return False
 
-        logger.info(f"✅ Transaction_payments cargados: {transaction_payments_result['inserted_count']} insertados")
+        transaction_payments_inserted = transaction_payments_result.get('inserted_count', 0)
+        report_builder.loading_completed("transaction_payments", transaction_payments_inserted, 0)
 
-        # 5. VALIDACIÓN POST-CARGA
-        logger.info("✅ PASO 5: Validando integridad de datos")
+        info(f"✅ Transaction_payments cargados: {transaction_payments_inserted} insertados")
+
+        subtitle("✅ PASO 5: Validando integridad de datos")
         integrity_validation = loader.validate_data_integrity()
 
         if not integrity_validation['valid']:
-            logger.error("❌ Validación de integridad fallida")
+            failure("❌ Validación de integridad fallida")
             for error in integrity_validation['errors']:
-                logger.error(f"   - {error}")
+                failure(f"   - {error}")
+            
+            int_errors, int_warnings = extract_validation_issues(integrity_validation)
+            report_builder.add_validation_errors(int_errors).add_validation_warnings(int_warnings)
+            report_builder.mark_failure()
+            report_builder.build().save_to_file()
             return False
 
-        # 6. RESULTADOS
-        end_time = datetime.now()
-        duration = end_time - start_time
+        if integrity_validation.get('warnings'):
+            report_builder.add_validation_warnings(integrity_validation['warnings'])
 
-        logger.info("🎉 === MIGRACIÓN DE PUNTOS DE USUARIOS COMPLETADA EXITOSAMENTE ===")
-        logger.info(f"⏱️  Duración total: {duration}")
-        logger.info(f"👥 User_points migrados: {integrity_validation['stats']['total_user_points']}")
-        logger.info(f"📊 Transactions migradas: {integrity_validation['stats']['total_transactions']}")
-        logger.info(f"💳 Transaction_payments migrados: {integrity_validation['stats']['total_transaction_payments']}")
+        success("🎉 === MIGRACIÓN DE PUNTOS DE USUARIOS COMPLETADA EXITOSAMENTE ===")
+        info(f"👥 User_points migrados: {integrity_validation['stats']['total_user_points']}")
+        info(f"📊 Transactions migradas: {integrity_validation['stats']['total_transactions']}")
+        info(f"💳 Transaction_payments migrados: {integrity_validation['stats']['total_transaction_payments']}")
 
-        # Guardar reporte simplificado
-        save_migration_report({
-            'summary': {
-                'success': True,
-                'duration': str(duration),
-                'user_points_migrated': integrity_validation['stats']['total_user_points'],
-                'transactions_migrated': integrity_validation['stats']['total_transactions'],
-                'transaction_payments_migrated': integrity_validation['stats']['total_transaction_payments']
-            },
-            'extraction': {
-                'total_extracted': len(user_points_data)
-            },
-            'transformation': {
-                'user_points_transformed': transform_summary['user_points_transformed'],
-                'transactions_transformed': transform_summary['transactions_transformed'],
-                'transaction_payments_transformed': transform_summary['transaction_payments_transformed'],
-                'total_errors': transform_summary['total_errors'],
-                'total_warnings': transform_summary['total_warnings'],
-                'errors': transform_summary['errors'],
-                'warnings': transform_summary['warnings'],
-                'validation': transformation_validation
-            },
-            'loading': {
-                'user_points_result': {
-                    'success': user_points_result['success'],
-                    'inserted_count': user_points_result['inserted_count'],
-                    'deleted_count': user_points_result['deleted_count']
-                },
-                'transactions_result': {
-                    'success': transactions_result['success'],
-                    'inserted_count': transactions_result['inserted_count']
-                },
-                'transaction_payments_result': {
-                    'success': transaction_payments_result['success'],
-                    'inserted_count': transaction_payments_result['inserted_count']
-                },
-                'load_stats': loader.get_load_stats(),
-                'integrity_validation': integrity_validation
-            }
-        })
+        report_builder.mark_success()
+        final_report = report_builder.build()
+        final_report.save_to_file()
 
         return True
 
     except Exception as e:
-        logger.error(f"💥 Error crítico durante la migración de puntos de usuarios: {str(e)}")
-        logger.exception("Detalles del error:")
+        failure(f"💥 Error crítico durante la migración de puntos de usuarios: {str(e)}")
+        report_builder.add_validation_errors([f"Error crítico: {str(e)}"])
+        report_builder.mark_failure()
+        report_builder.build().save_to_file()
+        
         return False
 
     finally:
-        # Cerrar conexiones
         try:
             if 'extractor' in locals():
                 extractor.close_connection()
@@ -166,104 +173,69 @@ def main():
             if 'loader' in locals():
                 loader.close_connection()
         except Exception as e:
-            logger.error(f"Error cerrando conexiones: {str(e)}")
+            failure(f"Error cerrando conexiones: {str(e)}")
 
-def save_migration_report(report_data, filename_prefix="user_points_migration_report"):
-    """Guarda el reporte de migración simplificado en un archivo"""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_filename = f"{filename_prefix}_{timestamp}.json"
-
-    import json
-    with open(report_filename, 'w', encoding='utf-8') as f:
-        json.dump(report_data, f, indent=2, default=str)
-
-    logger.info(f"📄 Reporte de migración guardado en: {report_filename}")
-
-def validate_environment():
-    """Valida que las variables de entorno estén configuradas"""
-    required_vars = ['NEXUS_POSTGRES_URL', 'MS_NEXUS_POINTS', 'MS_NEXUS_USER', 'MS_NEXUS_PAYMENTS']
-    missing_vars = []
-
-    for var in required_vars:
-        if not os.getenv(var):
-            missing_vars.append(var)
-
-    if missing_vars:
-        logger.error("❌ Variables de entorno faltantes:")
-        for var in missing_vars:
-            logger.error(f"   - {var}")
-        return False
-
-    return True
 
 def check_dependencies():
-    """Verifica que las dependencias estén disponibles"""
-    logger.info("🔍 Verificando dependencias...")
+    info("🔍 Verificando dependencias...")
 
     try:
-        # Verificar que existan usuarios en MongoDB
         from src.shared.user_service import UserService
 
         user_service = UserService()
-        # Hacer una búsqueda de prueba
         test_result = user_service.get_user_by_email("test@test.com")
         user_service.close_connection()
 
-        logger.info("✅ Servicio de usuarios disponible")
+        info("✅ Servicio de usuarios disponible")
 
-        # Verificar que existan pagos en ms-payments
         from src.shared.payment_service import PaymentService
 
         payment_service = PaymentService()
-        # Hacer una búsqueda de prueba
         test_payment = payment_service.get_payment_by_id(1)
         payment_service.close_connection()
 
-        logger.info("✅ Servicio de pagos disponible")
+        info("✅ Servicio de pagos disponible")
         return True
 
     except Exception as e:
-        logger.error(f"❌ Error verificando dependencias: {str(e)}")
+        failure(f"❌ Error verificando dependencias: {str(e)}")
         return False
 
+
 def test_connections():
-    """Prueba las conexiones a las bases de datos"""
-    logger.info("🔍 Probando conexiones a bases de datos...")
+    info("🔍 Probando conexiones a bases de datos...")
 
     try:
-        # Probar conexión al monolito
         from src.connections.postgres_connection import PostgresConnection
         monolito_conn = PostgresConnection()
         monolito_conn.connect()
-        logger.info("✅ Conexión al monolito (PostgreSQL) exitosa")
+        info("✅ Conexión al monolito (PostgreSQL) exitosa")
         monolito_conn.disconnect()
 
-        # Probar conexión a ms-points
         from src.connections.points_postgres_connection import PointsPostgresConnection
         points_conn = PointsPostgresConnection()
         points_conn.connect()
-        logger.info("✅ Conexión a ms-points (PostgreSQL) exitosa")
+        info("✅ Conexión a ms-points (PostgreSQL) exitosa")
         points_conn.disconnect()
 
-        # Probar conexión a ms-users (MongoDB)
         from src.connections.mongo_connection import MongoConnection
         mongo_conn = MongoConnection()
         mongo_conn.connect()
-        logger.info("✅ Conexión a ms-users (MongoDB) exitosa")
+        info("✅ Conexión a ms-users (MongoDB) exitosa")
         mongo_conn.disconnect()
 
-        # Probar conexión a ms-payments (PostgreSQL)
         from src.connections.payments_postgres_connection import PaymentsPostgresConnection
         payments_conn = PaymentsPostgresConnection()
         payments_conn.connect()
-        logger.info("✅ Conexión a ms-payments (PostgreSQL) exitosa")
+        info("✅ Conexión a ms-payments (PostgreSQL) exitosa")
         payments_conn.disconnect()
 
         return True
 
     except Exception as e:
-        logger.error(f"❌ Error en conexiones: {str(e)}")
+        failure(f"❌ Error en conexiones: {str(e)}")
         return False
+
 
 if __name__ == "__main__":
     try:
@@ -271,9 +243,6 @@ if __name__ == "__main__":
         load_dotenv()
     except ImportError:
         pass
-
-    if not validate_environment():
-        sys.exit(1)
 
     if not test_connections():
         sys.exit(1)

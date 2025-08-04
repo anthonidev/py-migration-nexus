@@ -8,13 +8,6 @@ class WeeklyVolumesLoader:
 
     def __init__(self):
         self.postgres_conn = PointsPostgresConnection()
-        self.stats = {
-            'weekly_volumes_inserted': 0,
-            'history_inserted': 0,
-            'weekly_volumes_deleted': 0,
-            'history_deleted': 0,
-            'errors': []
-        }
 
     def _check_tables_exist(self):
         """Verifica que las tablas necesarias existan"""
@@ -46,9 +39,6 @@ class WeeklyVolumesLoader:
             # Resetear solo la secuencia de weekly_volumes (history usa autoincremental normal)
             self.postgres_conn.execute_query("SELECT setval('weekly_volumes_id_seq', COALESCE((SELECT MAX(id) FROM weekly_volumes), 0) + 1, false);")
 
-            self.stats['weekly_volumes_deleted'] = volumes_deleted
-            self.stats['history_deleted'] = history_deleted
-
             logger.info(f"Eliminados {volumes_deleted} volúmenes semanales, {history_deleted} history")
 
             return {
@@ -59,7 +49,6 @@ class WeeklyVolumesLoader:
         except Exception as e:
             error_msg = f"Error eliminando datos existentes: {str(e)}"
             logger.error(error_msg)
-            self.stats['errors'].append(error_msg)
             raise
 
     def load_weekly_volumes(self, volumes_data: List[Dict[str, Any]], clear_existing: bool = False) -> Dict[str, Any]:
@@ -69,35 +58,35 @@ class WeeklyVolumesLoader:
         try:
             self._check_tables_exist()
             
+            deleted_count = 0
             if clear_existing:
-                self.clear_existing_data()
+                clear_result = self.clear_existing_data()
+                deleted_count = clear_result['weekly_volumes_deleted']
 
             if not volumes_data:
                 logger.warning("No hay volúmenes semanales para insertar")
                 return {
                     'success': True,
                     'inserted_count': 0,
-                    'deleted_count': self.stats['weekly_volumes_deleted']
+                    'deleted_count': deleted_count
                 }
 
             inserted_count = self._insert_weekly_volumes_with_original_ids(volumes_data)
-            self.stats['weekly_volumes_inserted'] = inserted_count
             logger.info(f"Insertados {inserted_count} volúmenes semanales exitosamente")
 
             return {
                 'success': True,
                 'inserted_count': inserted_count,
-                'deleted_count': self.stats['weekly_volumes_deleted']
+                'deleted_count': deleted_count
             }
 
         except Exception as e:
             error_msg = f"Error cargando volúmenes semanales: {str(e)}"
             logger.error(error_msg)
-            self.stats['errors'].append(error_msg)
             return {
                 'success': False,
                 'inserted_count': 0,
-                'deleted_count': self.stats['weekly_volumes_deleted'],
+                'deleted_count': deleted_count if 'deleted_count' in locals() else 0,
                 'error': str(e)
             }
 
@@ -111,7 +100,6 @@ class WeeklyVolumesLoader:
                 return {'success': True, 'inserted_count': 0}
 
             inserted_count = self._insert_volume_history_with_original_ids(history_data)
-            self.stats['history_inserted'] = inserted_count
             logger.info(f"Insertados {inserted_count} registros de historial exitosamente")
 
             return {'success': True, 'inserted_count': inserted_count}
@@ -119,7 +107,6 @@ class WeeklyVolumesLoader:
         except Exception as e:
             error_msg = f"Error cargando historial: {str(e)}"
             logger.error(error_msg)
-            self.stats['errors'].append(error_msg)
             return {'success': False, 'inserted_count': 0, 'error': str(e)}
 
     def _insert_weekly_volumes_with_original_ids(self, volumes_data: List[Dict[str, Any]]) -> int:
@@ -205,10 +192,7 @@ class WeeklyVolumesLoader:
 
         try:
             inserted_count = self.postgres_conn.execute_bulk_insert(insert_query, params_list)
-
-            # No necesitamos actualizar la secuencia ya que se maneja automáticamente
             logger.info(f"Insertados {inserted_count} registros de historial con IDs autoincrementables")
-
             return len(history_data)
 
         except Exception as e:
@@ -308,17 +292,6 @@ class WeeklyVolumesLoader:
             validation_results['valid'] = False
 
         return validation_results
-
-    def get_load_stats(self) -> Dict[str, Any]:
-        """Retorna estadísticas de la carga"""
-        return {
-            'weekly_volumes_inserted': self.stats['weekly_volumes_inserted'],
-            'history_inserted': self.stats['history_inserted'],
-            'weekly_volumes_deleted': self.stats['weekly_volumes_deleted'],
-            'history_deleted': self.stats['history_deleted'],
-            'total_errors': len(self.stats['errors']),
-            'errors': self.stats['errors']
-        }
 
     def close_connection(self):
         """Cierra la conexión a la base de datos"""

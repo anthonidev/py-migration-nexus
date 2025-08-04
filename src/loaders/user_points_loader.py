@@ -8,15 +8,6 @@ class UserPointsLoader:
 
     def __init__(self):
         self.postgres_conn = PointsPostgresConnection()
-        self.stats = {
-            'user_points_inserted': 0,
-            'transactions_inserted': 0,
-            'transaction_payments_inserted': 0,
-            'user_points_deleted': 0,
-            'transactions_deleted': 0,
-            'transaction_payments_deleted': 0,
-            'errors': []
-        }
 
     def _check_tables_exist(self):
         """Verifica que las tablas necesarias existan"""
@@ -53,10 +44,6 @@ class UserPointsLoader:
             self.postgres_conn.execute_query("SELECT setval('points_transactions_id_seq', COALESCE((SELECT MAX(id) FROM points_transactions), 0) + 1, false);")
             self.postgres_conn.execute_query("SELECT setval('points_transaction_payments_id_seq', COALESCE((SELECT MAX(id) FROM points_transaction_payments), 0) + 1, false);")
 
-            self.stats['user_points_deleted'] = user_points_deleted
-            self.stats['transactions_deleted'] = transactions_deleted
-            self.stats['transaction_payments_deleted'] = payments_deleted
-
             logger.info(f"Eliminados {user_points_deleted} user_points, {transactions_deleted} transactions, {payments_deleted} transaction_payments")
 
             return {
@@ -68,7 +55,6 @@ class UserPointsLoader:
         except Exception as e:
             error_msg = f"Error eliminando datos existentes: {str(e)}"
             logger.error(error_msg)
-            self.stats['errors'].append(error_msg)
             raise
 
     def load_user_points(self, user_points_data: List[Dict[str, Any]], clear_existing: bool = False) -> Dict[str, Any]:
@@ -78,35 +64,35 @@ class UserPointsLoader:
         try:
             self._check_tables_exist()
             
+            deleted_count = 0
             if clear_existing:
-                self.clear_existing_data()
+                clear_result = self.clear_existing_data()
+                deleted_count = clear_result['user_points_deleted']
 
             if not user_points_data:
                 logger.warning("No hay user_points para insertar")
                 return {
                     'success': True,
                     'inserted_count': 0,
-                    'deleted_count': self.stats['user_points_deleted']
+                    'deleted_count': deleted_count
                 }
 
             inserted_count = self._insert_user_points_with_original_ids(user_points_data)
-            self.stats['user_points_inserted'] = inserted_count
             logger.info(f"Insertados {inserted_count} user_points exitosamente")
 
             return {
                 'success': True,
                 'inserted_count': inserted_count,
-                'deleted_count': self.stats['user_points_deleted']
+                'deleted_count': deleted_count
             }
 
         except Exception as e:
             error_msg = f"Error cargando user_points: {str(e)}"
             logger.error(error_msg)
-            self.stats['errors'].append(error_msg)
             return {
                 'success': False,
                 'inserted_count': 0,
-                'deleted_count': self.stats['user_points_deleted'],
+                'deleted_count': deleted_count if 'deleted_count' in locals() else 0,
                 'error': str(e)
             }
 
@@ -120,7 +106,6 @@ class UserPointsLoader:
                 return {'success': True, 'inserted_count': 0}
 
             inserted_count = self._insert_transactions_with_original_ids(transactions_data)
-            self.stats['transactions_inserted'] = inserted_count
             logger.info(f"Insertadas {inserted_count} transactions exitosamente")
 
             return {'success': True, 'inserted_count': inserted_count}
@@ -128,7 +113,6 @@ class UserPointsLoader:
         except Exception as e:
             error_msg = f"Error cargando transactions: {str(e)}"
             logger.error(error_msg)
-            self.stats['errors'].append(error_msg)
             return {'success': False, 'inserted_count': 0, 'error': str(e)}
 
     def load_transaction_payments(self, transaction_payments_data: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -141,7 +125,6 @@ class UserPointsLoader:
                 return {'success': True, 'inserted_count': 0}
 
             inserted_count = self._insert_transaction_payments_with_original_ids(transaction_payments_data)
-            self.stats['transaction_payments_inserted'] = inserted_count
             logger.info(f"Insertados {inserted_count} transaction_payments exitosamente")
 
             return {'success': True, 'inserted_count': inserted_count}
@@ -149,7 +132,6 @@ class UserPointsLoader:
         except Exception as e:
             error_msg = f"Error cargando transaction_payments: {str(e)}"
             logger.error(error_msg)
-            self.stats['errors'].append(error_msg)
             return {'success': False, 'inserted_count': 0, 'error': str(e)}
 
     def _insert_user_points_with_original_ids(self, user_points_data: List[Dict[str, Any]]) -> int:
@@ -399,19 +381,6 @@ class UserPointsLoader:
             validation_results['valid'] = False
 
         return validation_results
-
-    def get_load_stats(self) -> Dict[str, Any]:
-        """Retorna estadísticas de la carga"""
-        return {
-            'user_points_inserted': self.stats['user_points_inserted'],
-            'transactions_inserted': self.stats['transactions_inserted'],
-            'transaction_payments_inserted': self.stats['transaction_payments_inserted'],
-            'user_points_deleted': self.stats['user_points_deleted'],
-            'transactions_deleted': self.stats['transactions_deleted'],
-            'transaction_payments_deleted': self.stats['transaction_payments_deleted'],
-            'total_errors': len(self.stats['errors']),
-            'errors': self.stats['errors']
-        }
 
     def close_connection(self):
         """Cierra la conexión a la base de datos"""
