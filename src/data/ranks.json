@@ -257,6 +257,6 @@
         "maxSponsorshipBranchQv": 3500000,
         "maxLegBalancePercentage": 50,
         "minDepthLevels": 10,
-        "rankOrder": 12
+        "rankOrder": 13
     }
 ]

@@ -12,9 +12,11 @@ from .user_points_extractor import UserPointsExtractor
 from .weekly_volumes_extractor import WeeklyVolumesExtractor
 from .products_extractor import ProductsExtractor
 from .orders_extractor import OrdersExtractor
+from .ranks_extractor import RanksExtractor
 
 __all__ = ['RolesViewsExtractor', 'UsersExtractor',
            'PaymentConfigsExtractor', 'PaymentsExtractor', 
            'MembershipPlansExtractor', 'MembershipsExtractor',
            'UserPointsExtractor', 'WeeklyVolumesExtractor',
+           'RanksExtractor',
            'ProductsExtractor', 'OrdersExtractor', 'WithdrawalsExtractor']

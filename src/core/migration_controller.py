@@ -62,6 +62,10 @@ class MigrationController:
         def migrate_orders():
             from src.core.orders_migration import main
             return main()
+        
+        def migrate_ranks():
+            from src.core.ranks_migration import main
+            return main()
 
 
         return {
@@ -78,9 +82,10 @@ class MigrationController:
                 "membership-plans": migrate_membership_plans,
                 "memberships": migrate_memberships,
             },
-            "ms-points": {
+             "ms-points": {
                 "user-points": migrate_user_points,
                 "weekly-volumes": migrate_weekly_volumes,
+                "ranks": migrate_ranks, 
             },
             "ms-orders": {
                 "products": migrate_products,
@@ -106,7 +111,8 @@ class MigrationController:
             },
             "ms-points": {
                 "user-points": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_POINTS', 'MS_NEXUS_USER', 'MS_NEXUS_PAYMENTS'],
-                "weekly-volumes": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_POINTS', 'MS_NEXUS_USER']
+                "weekly-volumes": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_POINTS', 'MS_NEXUS_USER'],
+                "ranks": ['MS_NEXUS_POINTS'] 
             },
              "ms-orders": {
                 "products": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_ORDERS', 'MS_NEXUS_USER'],

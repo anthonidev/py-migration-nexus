@@ -12,9 +12,11 @@ from .weekly_volumes_transformer import WeeklyVolumesTransformer
 from .products_transformer import ProductsTransformer
 from .orders_transformer import OrdersTransformer
 from .withdrawals_transformer import WithdrawalsTransformer
+from .ranks_transformer import RanksTransformer
 
 __all__ = ['RolesViewsTransformer', 'UsersTransformer',
            'PaymentConfigsTransformer', 'PaymentsTransformer',
            'MembershipPlansTransformer', 'MembershipsTransformer',
            'UserPointsTransformer', 'WeeklyVolumesTransformer',
-           'ProductsTransformer', 'OrdersTransformer', 'WithdrawalsTransformer']
+           'ProductsTransformer', 'OrdersTransformer', 'WithdrawalsTransformer',
+           'RanksTransformer']
