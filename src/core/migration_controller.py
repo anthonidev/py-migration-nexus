@@ -34,6 +34,10 @@ class MigrationController:
         def migrate_payments():
             from src.core.payments_migration import main
             return main()
+        
+        def migrate_withdrawals():
+            from src.core.withdrawals_migration import main
+            return main()
 
         def migrate_membership_plans():
             from src.core.membership_plans_migration import main
@@ -68,6 +72,7 @@ class MigrationController:
             "ms-payments": {
                 "payment-configs": migrate_payment_configs,
                 "payments": migrate_payments,
+                "withdrawals": migrate_withdrawals,  
             },
             "ms-membership": {
                 "membership-plans": migrate_membership_plans,
@@ -92,7 +97,8 @@ class MigrationController:
             },
             "ms-payments": {
                 "payment-configs": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_PAYMENTS'],
-                "payments": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_PAYMENTS', 'MS_NEXUS_USER']
+                "payments": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_PAYMENTS', 'MS_NEXUS_USER'],
+                "withdrawals": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_PAYMENTS', 'MS_NEXUS_USER'] 
             },
             "ms-membership": {
                 "membership-plans": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_MEMBERSHIP'],

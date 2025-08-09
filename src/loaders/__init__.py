@@ -11,9 +11,10 @@ from .user_points_loader import UserPointsLoader
 from .weekly_volumes_loader import WeeklyVolumesLoader
 from .products_loader import ProductsLoader
 from .orders_loader import OrdersLoader
+from .withdrawals_loader import WithdrawalsLoader
 
 __all__ = ['MongoLoader', 'UsersLoader',
            'PaymentConfigsLoader', 'PaymentsLoader', 
            'MembershipPlansLoader', 'MembershipsLoader',
            'UserPointsLoader', 'WeeklyVolumesLoader',
-           'ProductsLoader', 'OrdersLoader']
+           'ProductsLoader', 'OrdersLoader', 'WithdrawalsLoader']
