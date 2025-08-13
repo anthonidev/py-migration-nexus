@@ -67,6 +67,14 @@ class MigrationController:
             from src.core.ranks_migration import main
             return main()
 
+        def migrate_user_ranks():
+            from src.core.user_ranks_migration import main
+            return main()
+
+        def migrate_monthly_volume_ranks():
+            from src.core.monthly_volume_ranks_migration import main
+            return main()
+
 
         return {
             "ms-users": {
@@ -85,7 +93,9 @@ class MigrationController:
              "ms-points": {
                 "user-points": migrate_user_points,
                 "weekly-volumes": migrate_weekly_volumes,
-                "ranks": migrate_ranks, 
+                "ranks": migrate_ranks,
+                "user-ranks": migrate_user_ranks,
+                "monthly-volume-ranks": migrate_monthly_volume_ranks,
             },
             "ms-orders": {
                 "products": migrate_products,
@@ -112,7 +122,9 @@ class MigrationController:
             "ms-points": {
                 "user-points": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_POINTS', 'MS_NEXUS_USER', 'MS_NEXUS_PAYMENTS'],
                 "weekly-volumes": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_POINTS', 'MS_NEXUS_USER'],
-                "ranks": ['MS_NEXUS_POINTS'] 
+                "ranks": ['MS_NEXUS_POINTS'],
+                "user-ranks": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_POINTS', 'MS_NEXUS_USER'],
+                "monthly-volume-ranks": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_POINTS', 'MS_NEXUS_USER']
             },
              "ms-orders": {
                 "products": ['NEXUS_POSTGRES_URL', 'MS_NEXUS_ORDERS', 'MS_NEXUS_USER'],
