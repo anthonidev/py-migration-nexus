@@ -21,19 +21,6 @@
         "parentId": null
       },
       {
-        "id": 2,
-        "code": "PROFILE",
-        "name": "Perfil",
-        "icon": "profile",
-        "url": "/dashboard/perfil",
-        "isActive": true,
-        "order": 2,
-        "metadata": null,
-        "createdAt": "2025-04-14T23:43:45.562413",
-        "updatedAt": "2025-04-14T23:43:45.562413",
-        "parentId": null
-      },
-      {
         "id": 3,
         "code": "USERS_ADMIN",
         "name": "Gestión de Usuarios",
@@ -67,19 +54,6 @@
         "metadata": null,
         "createdAt": "2025-04-14T23:43:45.548042",
         "updatedAt": "2025-04-14T23:43:45.548042",
-        "parentId": null
-      },
-      {
-        "id": 2,
-        "code": "PROFILE",
-        "name": "Perfil",
-        "icon": "profile",
-        "url": "/dashboard/perfil",
-        "isActive": true,
-        "order": 2,
-        "metadata": null,
-        "createdAt": "2025-04-14T23:43:45.562413",
-        "updatedAt": "2025-04-14T23:43:45.562413",
         "parentId": null
       },
       {
@@ -159,6 +133,58 @@
         "createdAt": "2025-05-16T05:11:11.573637",
         "updatedAt": "2025-05-16T05:11:11.573637",
         "parentId": null
+      },
+      {
+        "id": 35,
+        "code": "BANNERS_FAC",
+        "name": "Banners",
+        "icon": "banners",
+        "url": "/dashboard/fac-banners",
+        "isActive": true,
+        "order": 5,
+        "metadata": null,
+        "createdAt": "2025-05-16T05:11:11.573637",
+        "updatedAt": "2025-05-16T05:11:11.573637",
+        "parentId": null
+      },
+      {
+        "id": 36,
+        "code": "LEADS_FAC",
+        "name": "Leads",
+        "icon": "leads",
+        "url": "/dashboard/fac-leads",
+        "isActive": true,
+        "order": 6,
+        "metadata": null,
+        "createdAt": "2025-05-16T05:11:11.573637",
+        "updatedAt": "2025-05-16T05:11:11.573637",
+        "parentId": null
+      },
+      {
+        "id": 37,
+        "code": "CLAIMS_BOOK_FAC",
+        "name": "Libro de Reclamaciones",
+        "icon": "claims-book",
+        "url": "/dashboard/fac-libro-reclamaciones",
+        "isActive": true,
+        "order": 7,
+        "metadata": null,
+        "createdAt": "2025-05-16T05:11:11.573637",
+        "updatedAt": "2025-05-16T05:11:11.573637",
+        "parentId": null
+      },
+      {
+        "id": 38,
+        "code": "REPORTS_FAC",
+        "name": "Reportes",
+        "icon": "reports",
+        "url": "/dashboard/fac-reportes",
+        "isActive": true,
+        "order": 8,
+        "metadata": null,
+        "createdAt": "2025-05-16T05:11:11.573637",
+        "updatedAt": "2025-05-16T05:11:11.573637",
+        "parentId": null
       }
     ]
   },
@@ -188,7 +214,7 @@
         "code": "PROFILE",
         "name": "Perfil",
         "icon": "profile",
-        "url": "/dashboard/perfil",
+        "url": "/dashboard/cli-perfil",
         "isActive": true,
         "order": 2,
         "metadata": null,
@@ -383,7 +409,7 @@
         "code": "ORDERS_CLI",
         "name": "Pedidos",
         "icon": "orders",
-        "url": "/tienda/pedidos",
+        "url": "/dashboard/cli-tienda/pedidos",
         "isActive": true,
         "order": 3,
         "metadata": null,
@@ -555,19 +581,6 @@
         "metadata": null,
         "createdAt": "2025-04-14T23:43:45.548042",
         "updatedAt": "2025-04-14T23:43:45.548042",
-        "parentId": null
-      },
-      {
-        "id": 2,
-        "code": "PROFILE",
-        "name": "Perfil",
-        "icon": "profile",
-        "url": "/dashboard/perfil",
-        "isActive": true,
-        "order": 2,
-        "metadata": null,
-        "createdAt": "2025-04-14T23:43:45.562413",
-        "updatedAt": "2025-04-14T23:43:45.562413",
         "parentId": null
       }
     ]

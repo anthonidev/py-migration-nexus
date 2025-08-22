@@ -92,6 +92,9 @@ class WeeklyVolumesTransformer:
         # Procesar fecha de procesamiento
         processed_at = self._process_datetime(volume.get('processedAt'))
 
+        if commission_earned != None and  commission_earned <= 0 :
+            status = "CANCELLED"
+
         # Crear volumen transformado
         transformed_volume = {
             'id': volume_id,  # Conservar ID original
@@ -106,7 +109,7 @@ class WeeklyVolumesTransformer:
             'status': status,
             'selected_side': selected_side,
             'processed_at': processed_at,
-            'metadata': {},  # Siempre objeto vacío según especificación
+            'metadata': volume.get('metadata', {}), 
             'created_at': self._process_datetime(volume.get('createdAt')),
             'updated_at': self._process_datetime(volume.get('createdAt'))  # usar createdAt como updatedAt inicial
         }

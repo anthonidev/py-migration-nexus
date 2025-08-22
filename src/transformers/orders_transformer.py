@@ -29,7 +29,9 @@ class OrdersTransformer:
             'SENT': 'SENT',
             'DELIVERED': 'DELIVERED',
             'REJECTED': 'REJECTED',
-            'CANCELLED': 'REJECTED'  # Mapear CANCELLED a REJECTED
+            'CANCELLED': 'REJECTED',  # Mapear CANCELLED a REJECTED
+            'APROBADO': 'APPROVED',
+            'ENVIADO': 'SENT'
         }
         
         # Mapeo de actions del monolito a los enum del microservicio
@@ -39,7 +41,9 @@ class OrdersTransformer:
             'SENT': 'SENT', 
             'DELIVERED': 'DELIVERED',
             'REJECTED': 'REJECTED',
-            'CANCELLED': 'CANCELLED'
+            'CANCELLED': 'CANCELLED',
+            'APROBADO': 'APPROVED',
+            'ENVIADO': 'SENT'
         }
     
     def transform_orders_data(self, orders_data: List[Dict[str, Any]]) -> Dict[str, Any]:

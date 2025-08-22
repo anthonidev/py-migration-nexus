@@ -32,6 +32,7 @@ class WeeklyVolumesExtractor:
             wv."selectedSide",
             wv."createdAt" AS "processedAt",
             wv."createdAt",
+            wv.metadata,
             COALESCE(
                 JSON_AGG(
                     JSON_BUILD_OBJECT(

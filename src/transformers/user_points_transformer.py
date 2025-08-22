@@ -128,6 +128,7 @@ class UserPointsTransformer:
                 
                 # Mapear estado de transacción
                 status = self._map_transaction_status(transaction.get('status', ''))
+               
 
                 # Validar montos
                 amount = self._validate_decimal_field(
@@ -150,6 +151,9 @@ class UserPointsTransformer:
                 
                 # Procesar metadata
                 metadata = self._process_json_field(transaction.get('metadata'))
+                
+                if amount == 0:
+                    status = 'CANCELLED'
 
                 transformed_transaction = {
                     'id': original_id,  # Conservar ID original
@@ -483,3 +487,4 @@ class UserPointsTransformer:
             self.payment_service.close_connection()
         except Exception as e:
             logger.error(f"Error cerrando conexiones: {str(e)}")
+            

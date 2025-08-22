@@ -78,7 +78,7 @@ class MembershipsTransformer:
             'start_date': start_date,
             'end_date': end_date,
             'status': status,
-            'minimum_reconsumption_amount': minimum_reconsumption_amount,
+            'minimum_reconsumption_amount': 300.0,
             'auto_renewal': bool(membership.get('autoRenewal', False)),
             'metadata': {},  # Siempre objeto vacío según especificación
             'created_at': self._process_datetime(membership.get('createdAt')),
