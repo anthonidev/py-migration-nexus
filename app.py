@@ -4,6 +4,17 @@ from rich.console import Console
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# Fix Windows encoding issues
+if os.name == 'nt':
+    import locale
+    import codecs
+    # Set console encoding to UTF-8
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
+    # Force UTF-8 for stdout/stderr
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -14,7 +25,8 @@ from src.ui.components import UIComponents
 from src.core.migration_controller import MigrationController
 from src.utils.logger import get_logger
 
-console = Console()
+# Create console with proper encoding handling
+console = Console(force_terminal=True, width=120)
 logger = get_logger(__name__)
 
 class MigrationApp:
@@ -79,6 +91,9 @@ class MigrationApp:
             table = self.ui.show_submodules(module_name, submodules)
             console.print(table)
             console.print()
+            
+            # Show status legend
+            self.ui.show_status_legend()
             
             choice = self.ui.get_choice(
                 "Selecciona un submódulo",

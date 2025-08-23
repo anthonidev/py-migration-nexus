@@ -95,7 +95,15 @@ class MigrationReport:
             }
         }
     
-    def save_to_file(self, output_dir: str = ".", filename_prefix: Optional[str] = None) -> str:
+    def save_to_file(self, output_dir: str = None, filename_prefix: Optional[str] = None) -> str:
+        if output_dir is None:
+            # Default to reports directory in project root
+            project_root = Path(__file__).parent.parent.parent
+            output_dir = project_root / "reports"
+        
+        # Ensure reports directory exists
+        Path(output_dir).mkdir(exist_ok=True)
+        
         if filename_prefix is None:
             filename_prefix = f"{self.migration_name}_migration_report"
         
@@ -107,7 +115,7 @@ class MigrationReport:
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(self.to_dict(), f, indent=2, default=str)
             
-            logger.info(f"📄 Reporte de migración guardado en: {filepath}")
+            logger.info(f"Reporte de migración guardado en: {filepath}")
             return str(filepath)
             
         except Exception as e:
@@ -203,3 +211,65 @@ def process_transformation_summary(summary: Dict[str, Any]) -> tuple[int, List[s
     total_errors = summary.get('total_errors', len(errors))
     
     return total_errors, errors, warnings
+
+def check_migration_exists(migration_name: str, reports_dir: str = None) -> tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
+    """
+    Check if a migration has been completed by looking for report files.
+    
+    Returns:
+        tuple: (exists, latest_report_path, report_summary)
+    """
+    if reports_dir is None:
+        project_root = Path(__file__).parent.parent.parent
+        reports_dir = project_root / "reports"
+    
+    reports_path = Path(reports_dir)
+    if not reports_path.exists():
+        return False, None, None
+    
+    # Look for report files matching the migration name
+    pattern = f"{migration_name}_migration_report_*.json"
+    report_files = list(reports_path.glob(pattern))
+    
+    if not report_files:
+        return False, None, None
+    
+    # Get the most recent report file
+    latest_report = max(report_files, key=lambda x: x.stat().st_mtime)
+    
+    try:
+        with open(latest_report, 'r', encoding='utf-8') as f:
+            report_data = json.load(f)
+        
+        summary = {
+            'success': report_data.get('success', False),
+            'date': latest_report.stem.split('_')[-2:],  # Extract date and time from filename
+            'totals': report_data.get('totals', {}),
+            'validation': report_data.get('validation', {})
+        }
+        
+        return True, str(latest_report), summary
+        
+    except Exception as e:
+        logger.warning(f"Error reading report file {latest_report}: {str(e)}")
+        return True, str(latest_report), None
+
+def get_migration_status_indicator(migration_name: str) -> str:
+    """
+    Get a visual indicator for migration status.
+    
+    Returns:
+        str: Status indicator (✅ for success, ⚠️ for failed, "" for not run)
+    """
+    exists, _, summary = check_migration_exists(migration_name)
+    
+    if not exists:
+        return ""
+    
+    if summary is None:
+        return "[!]"  # Report exists but couldn't read it
+    
+    if summary.get('success', False):
+        return "[+]"
+    else:
+        return "[X]"

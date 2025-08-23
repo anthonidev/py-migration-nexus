@@ -8,8 +8,10 @@ from rich.text import Text
 from rich.align import Align
 from rich.columns import Columns
 import pyfiglet
+from src.utils.migration_reports import get_migration_status_indicator
 
-console = Console()
+# Create console with proper encoding handling
+console = Console(force_terminal=True, width=120)
 
 class UIComponents:
     
@@ -25,7 +27,7 @@ class UIComponents:
         banner = Text(banner_text, style="bold bright_cyan")
         console.print(Align.center(banner))
         
-        subtitle = Text("🚀 Migration Tool", style="bold yellow")
+        subtitle = Text(">>> Migration Tool", style="bold yellow")
         console.print(Align.center(subtitle))
         console.print()
     
@@ -39,12 +41,12 @@ class UIComponents:
         )
         
         table.add_column("", style="bold bright_white", width=3, justify="center")
-        table.add_column("Módulo", style="bold blue", width=20)
-        table.add_column("Submódulos", style="cyan")
+        table.add_column("Modulo", style="bold blue", width=20)
+        table.add_column("Submodulos", style="cyan")
         
         for i, (module_name, submodules) in enumerate(modules.items(), 1):
             if submodules:
-                submodule_list = " • ".join(submodules.keys())
+                submodule_list = " | ".join(submodules.keys())
             else:
                 submodule_list = "[dim]En desarrollo[/]"
             
@@ -54,13 +56,13 @@ class UIComponents:
                 submodule_list
             )
         
-        table.add_row(str(len(modules) + 1), "🚪 Salir", "")
+        table.add_row(str(len(modules) + 1), "[ ] Salir", "")
         return table
     
     @staticmethod
     def show_submodules(module_name: str, submodules: Dict[str, Callable]) -> Table:
         table = Table(
-            title=f"📋 {module_name.upper()}", 
+            title=f"{module_name.upper()}", 
             show_header=True, 
             header_style="bold magenta",
             border_style="cyan",
@@ -68,12 +70,17 @@ class UIComponents:
         )
         
         table.add_column("", style="bold bright_white", width=3, justify="center")
-        table.add_column("Submódulo", style="bold cyan", width=25)
+        table.add_column("Submodulo", style="bold cyan", width=25)
+        table.add_column("Estado", style="bold green", width=8, justify="center")
         
         for i, submodule_name in enumerate(submodules.keys(), 1):
-            table.add_row(str(i), submodule_name)
+            # Get migration status indicator
+            status_indicator = get_migration_status_indicator(submodule_name.replace('-', '_'))
+            status_text = status_indicator if status_indicator else "[ ]"
+            
+            table.add_row(str(i), submodule_name, status_text)
         
-        table.add_row(str(len(submodules) + 1), "⬅️ Volver")
+        table.add_row(str(len(submodules) + 1), "<- Volver", "")
         return table
     
     @staticmethod
@@ -125,6 +132,27 @@ class UIComponents:
     @staticmethod
     def wait():
         console.input("\n🔄 Enter para continuar...")
+    
+    @staticmethod
+    def show_status_legend():
+        """Show the meaning of status indicators"""
+        legend_table = Table(
+            title="Leyenda de Estados", 
+            show_header=True,
+            header_style="bold cyan",
+            border_style="blue",
+            width=50
+        )
+        legend_table.add_column("Simbolo", style="bold", width=8, justify="center")
+        legend_table.add_column("Significado", style="white")
+        
+        legend_table.add_row("[+]", "Migracion completada exitosamente")
+        legend_table.add_row("[X]", "Migracion fallo")
+        legend_table.add_row("[!]", "Reporte existe pero no se puede leer")
+        legend_table.add_row("[ ]", "No se ha ejecutado")
+        
+        console.print(legend_table)
+        console.print()
         
     @staticmethod
     def show_env_status(env_vars: List[str]):
